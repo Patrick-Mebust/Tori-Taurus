@@ -77,5 +77,5 @@ class Bar:
 def metadata(source: str, mode: str, session: str) -> None:
     if not source.strip() or mode not in {"live", "delayed", "replay"}:
         raise ValueError("Invalid source or data mode")
-    if session not in {"premarket", "regular", "postmarket", "unknown"}:
+    if session not in {"premarket", "regular", "postmarket", "closed", "unknown"}:
         raise ValueError("Invalid session")

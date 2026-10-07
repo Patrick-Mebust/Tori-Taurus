@@ -4,6 +4,7 @@ from .alpaca import AlpacaProvider, MarketDataError
 from .csv_provider import CsvProvider
 from .models import Bar, Quote
 from .provider import MarketDataProvider, validate_freshness
+from .sessions import NyseSessions, SessionProvider
 
 __all__ = [
     "AlpacaProvider",
@@ -11,6 +12,8 @@ __all__ = [
     "CsvProvider",
     "MarketDataError",
     "MarketDataProvider",
+    "NyseSessions",
     "Quote",
+    "SessionProvider",
     "validate_freshness",
 ]

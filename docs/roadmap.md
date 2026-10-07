@@ -19,7 +19,7 @@ Goal: create one trustworthy interface for market data.
 - [x] Add read-only live provider adapter (Alpaca REST; mocked-response validation)
 - [ ] Verify authenticated real quote/bar responses
 - [x] Normalize aware timestamps to UTC
-- [ ] Exchange-calendar session classification (explicit/unknown sessions supported)
+- [x] Optional NYSE-family calendar classification (holidays, early closes, DST; daily bars unknown)
 - [x] Add freshness validation
 - [x] Add unit tests
 

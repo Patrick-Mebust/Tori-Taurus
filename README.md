@@ -143,13 +143,13 @@ Timestamps require an explicit timezone and normalize to UTC. Prices use Decimal
 Bars use inclusive start and exclusive end; results sort by timestamp and duplicate
 bars are rejected. Supported intervals: 1m, 5m, 15m, 1h, 1d. An optional `session`
 column accepts premarket, regular, postmarket, or unknown. Missing sessions remain
-unknown: no exchange-calendar or holiday inference is implemented.
+unknown unless you opt into the calendar decorator below.
 
 CSV records always report source=csv and mode=replay, even if the input says live.
 `validate_freshness(quote, now=..., max_age=...)` requires live provenance and rejects
 stale or future timestamps. Historical records do not need to pass live freshness.
 A read-only Alpaca REST adapter is implemented below. Authenticated live verification
-and exchange-calendar classification remain open in roadmap issue #1.
+remains open in roadmap issue #1; calendar classification is available below.
 
 ## Alpaca market data
 
@@ -175,7 +175,7 @@ consolidated market quote or total market volume. SIP access depends on your
 Alpaca entitlements. Sources remain explicit (`alpaca:iex` or `alpaca:sip`).
 A latest quote has live provenance but must still pass the caller's freshness
 policy before use. Historical bars are raw/unadjusted and labeled replay.
-Provider timestamps normalize to UTC; session stays unknown pending calendar support.
+Provider timestamps normalize to UTC; session stays unknown unless wrapped with SessionProvider.
 
 Historical retrieval follows all page tokens, sorts bars, rejects duplicates,
 and enforces inclusive start/exclusive end. Symbol remapping is disabled (`asof=-`).
@@ -186,3 +186,37 @@ must decide how to handle rate limits or temporary failures.
 
 Tests use synthetic mocked responses and never contact Alpaca. An authenticated
 live smoke test has not been performed. No trading/order endpoints are included.
+
+## Optional session classification
+
+Install `python -m pip install -e ".[dev,calendar]"` to enable the calendar package.
+Base imports and market-data adapters do not require this extra.
+
+```python
+from tori_taurus.market_data import NyseSessions, SessionProvider
+
+sessions = NyseSessions()
+provider_with_sessions = SessionProvider(provider, sessions)
+quote = provider_with_sessions.get_quote("AAPL")
+print(quote.session)
+```
+
+The decorator works with either CSV or Alpaca providers and preserves prices,
+timestamps, source/feed labels, and live/replay provenance. Quotes and intraday
+bars classify their record timestamps as premarket, regular, postmarket, or closed.
+Daily bars remain unknown because a daily aggregate spans multiple hours.
+
+This is an explicit NYSE-family daytime schedule convention, using
+[pandas-market-calendars](https://pandas-market-calendars.readthedocs.io/en/latest/usage.html).
+It follows Eastern local dates, DST, holidays, special closures, and early-close
+pre/open/close/post boundaries. Boundary starts are inclusive and ends exclusive.
+For example, November 27, 2026 closes regular trading at 13:00 ET and the extended
+schedule at 17:00 ET, consistent with the
+[NYSE calendar](https://www.nyse.com/trade/hours-calendars).
+
+A session label describes a record's timestamp; it does not report live market
+status, a symbol halt, or whether your broker/feed supports that session. Overnight
+trading, other venue calendars, and emergency closures absent from the installed
+calendar package are outside this convention. `closed` means outside this schedule.
+Update the calendar package as published rules change. Per-instance date schedules
+are cached with a bounded 366-day cache and require no network requests.
