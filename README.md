@@ -220,3 +220,37 @@ trading, other venue calendars, and emergency closures absent from the installed
 calendar package are outside this convention. `closed` means outside this schedule.
 Update the calendar package as published rules change. Per-instance date schedules
 are cached with a bounded 366-day cache and require no network requests.
+
+## Repeatable live smoke check
+
+After installing the package, run:
+
+```sh
+tori-market-check AAPL --feed iex --sessions
+# Equivalent without the installed command:
+python -m tori_taurus.market_data.smoke AAPL --feed iex --sessions
+```
+
+Set `ALPACA_API_KEY` and `ALPACA_API_SECRET` in your local environment first.
+The command never reads `.env` automatically and never accepts credentials as
+command-line arguments. Omit `--sessions` if the optional calendar extra is absent.
+
+Output is a JSON report with a UTC check time, quote source/feed, timestamp, decimal
+bid/ask, freshness, and history count/range. The default checks a quote against a
+60-second age budget and retrieves the previous seven calendar days of daily bars.
+Use `--max-age-seconds` to choose a nonnegative freshness budget and `--history-days`
+(1–30) to choose the history window. History must be nonempty, ordered, unique,
+inside the requested range, and match the requested ticker and quote source.
+
+Exit codes:
+- `0`: live quote passed freshness and historical data passed validation.
+- `1`: provider/data failure or quote not current.
+- `2`: check not run due to missing credentials or invalid configuration.
+
+A failed stale quote can be normal after market close; it does not pass as live.
+The report validates data transport and shape, not price accuracy, historical
+completeness, trade suitability, or broker execution. No orders are submitted.
+
+Development verification used synthetic responses. The local command reported
+`not_run` because Alpaca environment credentials were absent. Authenticated live
+verification remains pending; mocked test success is not a live-data refresh.

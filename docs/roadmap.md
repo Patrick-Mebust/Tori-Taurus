@@ -17,7 +17,8 @@ Goal: create one trustworthy interface for market data.
 - [x] Define provider interface
 - [x] Add first provider adapter (CSV replay)
 - [x] Add read-only live provider adapter (Alpaca REST; mocked-response validation)
-- [ ] Verify authenticated real quote/bar responses
+- [x] Add repeatable read-only quote/history smoke command and offline acceptance tests
+- [ ] Verify authenticated real quote/bar responses (local credentials required)
 - [x] Normalize aware timestamps to UTC
 - [x] Optional NYSE-family calendar classification (holidays, early closes, DST; daily bars unknown)
 - [x] Add freshness validation
