@@ -254,3 +254,50 @@ completeness, trade suitability, or broker execution. No orders are submitted.
 Development verification used synthetic responses. The local command reported
 `not_run` because Alpaca environment credentials were absent. Authenticated live
 verification remains pending; mocked test success is not a live-data refresh.
+
+## Phase 2: indicators and daily research scanner
+
+```python
+from datetime import datetime, timezone
+from decimal import Decimal
+from tori_taurus.scanner import ScanConfig, scan_daily
+
+config = ScanConfig(max_price=Decimal("5"), min_volume=100000,
+                    min_change_percent=Decimal("3"),
+                    min_relative_volume=Decimal("2"), volume_lookback=20)
+# histories maps normalized tickers to validated chronological daily Bar lists.
+results = scan_daily(histories, as_of=datetime.now(timezone.utc), config=config)
+candidates = [result for result in results if result["candidate"]]
+```
+
+The universe is supplied by the caller; no exchange-wide discovery is performed.
+Every result includes reasons, source, data mode, observation time and features.
+The upper price bound is exclusive: exactly $5 is outside an under-$5 scan.
+Daily relative volume divides the latest observed daily volume by the mean of
+exactly `volume_lookback` preceding daily bars, excluding the latest observation.
+Missing warm-up or zero denominators produce `None`, never fabricated values.
+A required unavailable metric rejects the candidate explicitly.
+
+`ema`, `rsi`, `atr`, and `vwap` are public functions in `tori_taurus.indicators`.
+EMA uses an initial period SMA and multiplier 2/(period+1). RSI and ATR use Wilder
+smoothing; RSI needs period+1 closes, ATR starts with high-low for the first bar.
+A completely flat RSI is defined as 50. EMA 5/9/20, RSI14 and ATR14 appear in
+scanner results when sufficiently warmed up. These conventions follow
+[StockCharts EMA](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/moving-averages-simple-and-exponential)
+and [RSI](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/relative-strength-index-rsi)
+calculation descriptions. Initialization/history length can affect values.
+
+VWAP uses volume-weighted (high+low+close)/3, a bar approximation rather than tick
+VWAP. It requires one known intraday session on one Eastern date, and returns None
+for zero volume. The caller must supply the complete desired session slice;
+a partial slice produces VWAP of only the supplied bars. Daily VWAP is rejected.
+See the [VWAP calculation reference](https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/volume-weighted-average-price-vwap).
+
+All calculations reject duplicate/unordered records and mixed symbols, intervals,
+sources or modes. Daily scanner timestamps must not exceed `as_of`. This timestamp
+check does not establish historical point-in-time availability or completed daily
+bars: callers must provide appropriate data. Split adjustment and feed coverage
+must be consistent; IEX volume is single-exchange volume. A partial daily bar cannot
+be compared fairly with full-day volume without a time-of-day baseline. Scanner
+matches are research candidates; they do not imply fresh prices or a trade signal.
+Intraday relative volume, volume acceleration, and session high/low remain pending.
