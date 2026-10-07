@@ -7,6 +7,7 @@ from datetime import UTC, datetime, timedelta
 from .indicators import session_features
 from .market_data import Bar, MarketDataProvider, Quote, validate_freshness
 from .market_data.models import symbol, utc
+from .risk import RiskInputs, evaluate_risk
 from .scanner import evaluate_daily
 from .setups import (
     evaluate_breakout_retest,
@@ -25,6 +26,7 @@ def build_report(
     session_bars: list[Bar] | None = None,
     baseline_sessions: list[list[Bar]] | None = None,
     max_quote_age: timedelta = timedelta(seconds=60),
+    risk_inputs: RiskInputs | None = None,
 ) -> dict:
     """Join observations without promoting replay/stale data to a live decision."""
     ticker, as_of = symbol(ticker), utc(as_of)
@@ -84,7 +86,13 @@ def build_report(
         except ValueError:
             # Intraday structural validation ran above; setup-specific age gates may fail.
             setups[name] = {"state": "UNAVAILABLE", "reason": "setup_observations_not_eligible"}
+    risk = {"status": "unavailable", "reason": "account_and_trade_plan_not_supplied"}
     blockers = ["risk_not_evaluated"]
+    if risk_inputs is not None:
+        if risk_inputs.symbol != ticker:
+            raise ValueError("Risk plan ticker mismatch")
+        risk = evaluate_risk(risk_inputs)
+        blockers = ["risk_inputs_unverified", "stop_not_broker_verified"] + risk["blockers"]
     if not quote_data["fresh"]:
         blockers.append("no_fresh_live_quote")
     if not session_bars:
@@ -101,7 +109,7 @@ def build_report(
         "daily_scan": daily,
         "intraday": intraday,
         "setups": setups,
-        "risk": {"status": "unavailable", "reason": "account_and_trade_plan_not_supplied"},
+        "risk": risk,
         "decision": {"state": "RESEARCH_ONLY", "ready_to_trade": False, "blockers": blockers},
         "note": "No trade score, risk approval, broker stop or order is implied.",
     }
@@ -133,7 +141,7 @@ def report_from_provider(
     return build_report(ticker, as_of=as_of, quote=quote, daily_bars=daily, session_bars=selected)
 
 
-def demo_report() -> dict:
+def demo_report(*, with_risk: bool = False) -> dict:
     """Fixed synthetic data makes the demonstration reproducible and visibly replay."""
     now = datetime(2026, 10, 7, 14, tzinfo=UTC)
     bars = [
@@ -166,7 +174,22 @@ def demo_report() -> dict:
         for i in range(2)
     ]
     quote = Quote("DEMO", now, 2, 3, "synthetic:demo", mode="replay")
-    return build_report("DEMO", as_of=now, quote=quote, daily_bars=daily, session_bars=bars)
+    plan = (
+        RiskInputs(
+            "DEMO",
+            equity=1000,
+            buying_power=100,
+            entry=3,
+            requested_shares=5,
+            stop=2,
+            stop_reported_active=False,
+        )
+        if with_risk
+        else None
+    )
+    return build_report(
+        "DEMO", as_of=now, quote=quote, daily_bars=daily, session_bars=bars, risk_inputs=plan
+    )
 
 
 def main(argv=None) -> int:
@@ -177,8 +200,9 @@ def main(argv=None) -> int:
         required=True,
         help="Use fixed synthetic replay data; no network or credentials",
     )
-    parser.parse_args(argv)
-    print(json.dumps(demo_report(), indent=2))
+    parser.add_argument("--with-risk", action="store_true", help="Include a synthetic account/plan")
+    args = parser.parse_args(argv)
+    print(json.dumps(demo_report(with_risk=args.with_risk), indent=2))
     return 0
 
 

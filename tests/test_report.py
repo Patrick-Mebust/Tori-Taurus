@@ -8,6 +8,7 @@ import pytest
 
 from tori_taurus.market_data import Bar, Quote
 from tori_taurus.report import build_report, report_from_provider
+from tori_taurus.risk import RiskInputs
 
 NOW = datetime(2026, 10, 7, 14, tzinfo=UTC)
 
@@ -52,6 +53,20 @@ def test_missing_data_stays_explicit():
     assert report["quote"]["status"] == "unavailable"
     assert report["daily_scan"]["status"] == "unavailable"
     assert all(s["state"] == "UNAVAILABLE" for s in report["setups"].values())
+
+
+def test_risk_integration_never_approves_execution():
+    plan = RiskInputs("TEST", 1000, 100, 2, 20, stop="1.5")
+    report = build_report("TEST", as_of=NOW, risk_inputs=plan)
+    assert report["risk"]["allowable_add_shares"] == 20
+    assert report["risk"]["account_risk_percent"] == "1.00"
+    assert "risk_inputs_unverified" in report["decision"]["blockers"]
+    assert not report["decision"]["ready_to_trade"]
+
+
+def test_risk_ticker_mismatch_is_rejected():
+    with pytest.raises(ValueError, match="ticker"):
+        build_report("TEST", as_of=NOW, risk_inputs=RiskInputs("OTHER", 1000, 100, 2, 20))
 
 
 def test_stale_observations_do_not_become_live():
