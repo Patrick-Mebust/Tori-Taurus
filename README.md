@@ -21,17 +21,17 @@ The project is intended both as a practical trading research tool and as an engi
 
 ## Planned capabilities
 
-- **Market Data Layer** â€” quotes, bars, volume, historical data, and account-aware inputs
-- **Momentum Scanner** â€” configurable scans for price, volume, relative volume, gaps, and momentum
-- **Catalyst Engine** â€” company news, SEC filings, scheduled events, and catalyst classification
-- **Signal Engine** â€” VWAP, EMA, RSI, momentum, support/resistance, and price/volume confirmation
-- **Setup Classifier** â€” identify repeatable patterns such as VWAP reclaim, breakout/retest, and first pullback
-- **Tori Score** â€” transparent weighted scoring instead of a black-box prediction
-- **Risk Engine** â€” position sizing, invalidation, reward/risk, concentration, and daily-loss guardrails
-- **FOMO Guard** â€” behavioral checks for chasing, rapid re-entry, averaging down, and overtrading
-- **Trading Journal** â€” structured review of entries, exits, thesis changes, and behavioral patterns
-- **Backtesting** â€” test setups against historical data before promoting them into live decision support
-- **Dashboard** â€” a unified view of candidates, current setups, risk, and post-trade review
+- **Market Data Layer** — quotes, bars, volume, historical data, and account-aware inputs
+- **Momentum Scanner** — configurable scans for price, volume, relative volume, gaps, and momentum
+- **Catalyst Engine** — company news, SEC filings, scheduled events, and catalyst classification
+- **Signal Engine** — VWAP, EMA, RSI, momentum, support/resistance, and price/volume confirmation
+- **Setup Classifier** — identify repeatable patterns such as VWAP reclaim, breakout/retest, and first pullback
+- **Tori Score** — transparent weighted scoring instead of a black-box prediction
+- **Risk Engine** — position sizing, invalidation, reward/risk, concentration, and daily-loss guardrails
+- **FOMO Guard** — behavioral checks for chasing, rapid re-entry, averaging down, and overtrading
+- **Trading Journal** — structured review of entries, exits, thesis changes, and behavioral patterns
+- **Backtesting** — test setups against historical data before promoting them into live decision support
+- **Dashboard** — a unified view of candidates, current setups, risk, and post-trade review
 
 ## Architecture principles
 
@@ -54,23 +54,23 @@ The project is intended both as a practical trading research tool and as an engi
 
 ```text
 Tori-Taurus/
-â”œâ”€â”€ docs/                  # Architecture and design notes
-â”œâ”€â”€ src/tori_taurus/
-â”‚   â”œâ”€â”€ market_data/       # Market/account data adapters
-â”‚   â”œâ”€â”€ scanner/           # Candidate discovery
-â”‚   â”œâ”€â”€ catalysts/         # News and filing analysis
-â”‚   â”œâ”€â”€ indicators/        # Technical calculations
-â”‚   â”œâ”€â”€ setups/            # Setup classification
-â”‚   â”œâ”€â”€ scoring/           # Tori Score
-â”‚   â”œâ”€â”€ risk/              # Risk and position sizing
-â”‚   â”œâ”€â”€ behavior/          # FOMO / behavioral guardrails
-â”‚   â”œâ”€â”€ journal/           # Trade journaling
-â”‚   â””â”€â”€ backtesting/       # Strategy evaluation
-â”œâ”€â”€ tests/
-â”œâ”€â”€ notebooks/
-â”œâ”€â”€ .env.example
-â”œâ”€â”€ pyproject.toml
-â””â”€â”€ README.md
+├── docs/                  # Architecture and design notes
+├── src/tori_taurus/
+│   ├── market_data/       # Market/account data adapters
+│   ├── scanner/           # Candidate discovery
+│   ├── catalysts/         # News and filing analysis
+│   ├── indicators/        # Technical calculations
+│   ├── setups/            # Setup classification
+│   ├── scoring/           # Tori Score
+│   ├── risk/              # Risk and position sizing
+│   ├── behavior/          # FOMO / behavioral guardrails
+│   ├── journal/           # Trade journaling
+│   └── backtesting/       # Strategy evaluation
+├── tests/
+├── notebooks/
+├── .env.example
+├── pyproject.toml
+└── README.md
 ```
 
 ## Local development
@@ -148,5 +148,41 @@ unknown: no exchange-calendar or holiday inference is implemented.
 CSV records always report source=csv and mode=replay, even if the input says live.
 `validate_freshness(quote, now=..., max_age=...)` requires live provenance and rejects
 stale or future timestamps. Historical records do not need to pass live freshness.
-No live API adapter, credential loading, or order execution is implemented yet.
-The Phase 1 live/current-data milestone remains open in roadmap issue #1.
+A read-only Alpaca REST adapter is implemented below. Authenticated live verification
+and exchange-calendar classification remain open in roadmap issue #1.
+
+## Alpaca market data
+
+The adapter follows Alpaca's [latest quote](https://docs.alpaca.markets/us/reference/stocklatestquotesingle-1)
+and [historical bars](https://docs.alpaca.markets/us/reference/stockbarsingle-1) contracts.
+Supply credentials through your local environment; importing the package never loads
+credentials or makes requests. The adapter does not read `.env` automatically.
+
+```python
+import os
+from datetime import datetime, timedelta, timezone
+from tori_taurus.market_data import AlpacaProvider, validate_freshness
+
+provider = AlpacaProvider(os.environ["ALPACA_API_KEY"],
+                          os.environ["ALPACA_API_SECRET"], feed="iex")
+quote = provider.get_quote("AAPL")
+validate_freshness(quote, now=datetime.now(timezone.utc), max_age=timedelta(seconds=60))
+print(quote)  # market fields only; no credentials
+```
+
+The supported feeds are `iex` and `sip`. IEX covers one exchange; it is not a
+consolidated market quote or total market volume. SIP access depends on your
+Alpaca entitlements. Sources remain explicit (`alpaca:iex` or `alpaca:sip`).
+A latest quote has live provenance but must still pass the caller's freshness
+policy before use. Historical bars are raw/unadjusted and labeled replay.
+Provider timestamps normalize to UTC; session stays unknown pending calendar support.
+
+Historical retrieval follows all page tokens, sorts bars, rejects duplicates,
+and enforces inclusive start/exclusive end. Symbol remapping is disabled (`asof=-`).
+The default 100-page cap rejects incomplete results; narrow your range or explicitly
+configure `max_pages` when needed. Requests have a finite timeout, disable redirects,
+and expose sanitized HTTP/error messages. There are no automatic retries: callers
+must decide how to handle rate limits or temporary failures.
+
+Tests use synthetic mocked responses and never contact Alpaca. An authenticated
+live smoke test has not been performed. No trading/order endpoints are included.

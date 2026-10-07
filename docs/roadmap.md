@@ -1,6 +1,6 @@
 # Development Roadmap
 
-## Phase 0 â€” Foundation
+## Phase 0 — Foundation
 
 - [x] Public GitHub repository
 - [x] Professional README
@@ -9,14 +9,15 @@
 - [x] Environment variable template
 - [x] Packaging configuration
 
-## Phase 1 â€” Market Data Core
+## Phase 1 — Market Data Core
 
 Goal: create one trustworthy interface for market data.
 
 - [x] Define quote/bar data models
 - [x] Define provider interface
 - [x] Add first provider adapter (CSV replay)
-- [ ] Add live provider adapter and validate real response normalization
+- [x] Add read-only live provider adapter (Alpaca REST; mocked-response validation)
+- [ ] Verify authenticated real quote/bar responses
 - [x] Normalize aware timestamps to UTC
 - [ ] Exchange-calendar session classification (explicit/unknown sessions supported)
 - [x] Add freshness validation
@@ -24,7 +25,7 @@ Goal: create one trustworthy interface for market data.
 
 **Milestone:** Given a ticker, Tori can return validated current/historical market data through one interface.
 
-## Phase 2 â€” Scanner + Indicators
+## Phase 2 — Scanner + Indicators
 
 - [ ] Under-$5 configurable scanner
 - [ ] VWAP
@@ -37,7 +38,7 @@ Goal: create one trustworthy interface for market data.
 
 **Milestone:** Tori produces a deterministic feature set for a candidate.
 
-## Phase 3 â€” Setup State
+## Phase 3 — Setup State
 
 - [ ] VWAP reclaim
 - [ ] breakout/retest
@@ -48,7 +49,7 @@ Goal: create one trustworthy interface for market data.
 
 **Milestone:** Tori can say *what setup is present and why* without relying on an LLM guess.
 
-## Phase 4 â€” Catalyst Engine
+## Phase 4 — Catalyst Engine
 
 - [ ] Source ingestion
 - [ ] timestamping
@@ -57,7 +58,7 @@ Goal: create one trustworthy interface for market data.
 - [ ] materiality classification
 - [ ] financing/dilution risk flags
 
-## Phase 5 â€” Tori Score
+## Phase 5 — Tori Score
 
 - [ ] Define score components
 - [ ] Define weights
@@ -65,7 +66,7 @@ Goal: create one trustworthy interface for market data.
 - [ ] calibrate against historical outcomes
 - [ ] version score formulas
 
-## Phase 6 â€” Risk + FOMO Guard
+## Phase 6 — Risk + FOMO Guard
 
 - [ ] dollar-risk calculation
 - [ ] account-risk %
@@ -76,7 +77,7 @@ Goal: create one trustworthy interface for market data.
 - [ ] chase/extension warning
 - [ ] daily loss guardrails
 
-## Phase 7 â€” Journal
+## Phase 7 — Journal
 
 - [ ] structured trade records
 - [ ] setup and catalyst snapshots
@@ -85,7 +86,7 @@ Goal: create one trustworthy interface for market data.
 - [ ] post-trade review
 - [ ] statistics by setup
 
-## Phase 8 â€” Backtesting
+## Phase 8 — Backtesting
 
 - [ ] historical event replay
 - [ ] transaction costs/slippage
@@ -95,7 +96,7 @@ Goal: create one trustworthy interface for market data.
 - [ ] walk-forward validation
 - [ ] no look-ahead bias checks
 
-## Phase 9 â€” Dashboard + Cloud
+## Phase 9 — Dashboard + Cloud
 
 - [ ] local dashboard
 - [ ] API service
