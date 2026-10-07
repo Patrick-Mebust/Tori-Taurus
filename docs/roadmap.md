@@ -44,7 +44,7 @@ Goal: create one trustworthy interface for market data.
 ## Phase 3 — Setup State
 
 - [x] VWAP reclaim
-- [ ] breakout/retest
+- [x] Breakout/retest research rule v1 (frozen seed level; distinct-bar transitions)
 - [ ] first pullback
 - [ ] higher-low continuation
 - [x] VWAP extension limit and explicit EXTENDED state

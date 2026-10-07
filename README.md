@@ -372,3 +372,37 @@ Partial slices can change results. A zero-volume slice reports UNAVAILABLE.
 This is a proposed deterministic rule with synthetic transition tests, not a
 backtested strategy or evidence of profitable performance. Breakout/retest,
 first-pullback, and higher-low continuation rules remain pending.
+
+## Breakout/retest research state
+
+```python
+from datetime import datetime, timezone
+from tori_taurus.setups import BreakoutConfig, evaluate_breakout_retest
+
+state = evaluate_breakout_retest(completed_session_bars,
+                                as_of=datetime.now(timezone.utc),
+                                config=BreakoutConfig(lookback_bars=5))
+```
+
+Rule v1.0 freezes resistance at the highest high of the initial `lookback_bars`
+(default five). Only subsequent bars can trigger the first breakout: a nonzero-volume
+close strictly above resistance. A distinct later bar must retest the level's upper
+tolerance band and close at/above resistance while holding above the lower anchor.
+A still later nonzero-volume close strictly above the retest high confirms.
+The tolerance is 0.5% by default; the anchor is resistance * (1-tolerance/100).
+The maximum close extension above resistance is 3% by default.
+
+States are NO_SETUP, WATCH, RETEST, CONFIRMED, EXTENDED, INVALIDATED, or UNAVAILABLE.
+After breakout, any later low at/below the anchor or close below resistance
+invalidates before retest/confirmation. Invalidation remains terminal for this
+first-breakout evaluation. Extension blocks new confirmation, retaining the
+breakout/retest timestamps so a later qualifying bar may confirm. Once confirmed,
+confirmation holds until invalidation or excessive extension.
+
+Output includes frozen resistance, anchor, confirmation high, transition timestamps,
+rule parameters, source/mode and coverage. Seed history never includes the breakout
+bar. Lookback selection is a caller-configured convention, not automatic discovery
+of an economically meaningful resistance level. Stale or unfinished bars fail;
+zero observed volume or insufficient seed/observation history is unavailable.
+No active stop or order is created. This proposed rule has synthetic transition
+tests and remains unbacktested. First-pullback and higher-low continuation are pending.
