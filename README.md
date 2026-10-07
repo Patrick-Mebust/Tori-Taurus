@@ -434,3 +434,29 @@ the same two-minute default observation-age policy as other setup rules.
 This v1.0 rule is proposed research logic with synthetic transition tests, not a
 validated profitable strategy. The anchor is not a broker stop or a position-size
 calculation. Higher-low continuation remains pending.
+
+## Higher-low continuation research state
+
+`evaluate_higher_low(bars, as_of=..., config=HigherLowConfig())` processes a completed,
+contiguous, labeled intraday session slice chronologically. A strict pivot low
+must be lower than each of `pivot_width` bars on both sides (default one). Every
+bar in that pivot window must have nonzero volume. Tied lows are not pivots.
+
+A pivot becomes available only after its right-side bars finish. A second
+consecutive confirmed pivot must have a strictly higher low and satisfy the
+configured minimum percentage improvement (default zero). WATCH begins when
+that higher low becomes known. `higher_low_at` identifies the pivot bar start;
+`identified_at` is the end of the right-side recognition bar, avoiding backdated
+knowledge. A separate later nonzero-volume close strictly above the highest high
+between the two pivots confirms within the default 3% extension limit.
+
+The higher-low price is the frozen research invalidation anchor; any subsequent
+low at/below it invalidates before confirmation. The intervening high remains
+fixed after recognition. Excessive extension reports EXTENDED and blocks new
+confirmation. INVALIDATED stays terminal for the first qualifying pair.
+
+Output includes pivot/recognition/transition timestamps, levels, rule version,
+parameters, source/mode and coverage. Other transition timestamps identify the
+associated completed bar starts; they do not imply that its close was available
+at the start. Stale/unfinished input fails. This proposed rule is tested against
+synthetic transitions and remains unbacktested; no stop or order is created.

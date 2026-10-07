@@ -46,11 +46,11 @@ Goal: create one trustworthy interface for market data.
 - [x] VWAP reclaim
 - [x] Breakout/retest research rule v1 (frozen seed level; distinct-bar transitions)
 - [x] First-pullback research rule v1 (defined impulse/depth/window; synthetic transitions)
-- [ ] higher-low continuation
+- [x] Higher-low continuation research rule v1 (delayed pivots; separate confirmation)
 - [x] VWAP extension limit and explicit EXTENDED state
-- [ ] Extension rules for other setups
+- [x] Configurable extension limits for all four setup rules
 - [x] Explicit confirmation/invalidation for VWAP reclaim
-- [ ] Confirmation/invalidation for remaining setups
+- [x] Explicit confirmation/invalidation for all four setup rules
 
 **Milestone:** Tori can say *what setup is present and why* without relying on an LLM guess.
 
