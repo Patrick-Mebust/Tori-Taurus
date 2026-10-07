@@ -12,6 +12,7 @@ dependencies = ["tzdata>=2025.2; platform_system == 'Windows'"]
 
 [project.scripts]
 tori-market-check = "tori_taurus.market_data.smoke:main"
+tori-report = "tori_taurus.report:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]

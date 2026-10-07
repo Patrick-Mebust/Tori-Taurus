@@ -460,3 +460,47 @@ parameters, source/mode and coverage. Other transition timestamps identify the
 associated completed bar starts; they do not imply that its close was available
 at the start. Stale/unfinished input fails. This proposed rule is tested against
 synthetic transitions and remains unbacktested; no stop or order is created.
+
+## Structured Tori research report
+
+```sh
+tori-report --demo
+# Or without reinstalling the command:
+python -m tori_taurus.report --demo
+```
+
+The demonstration uses fixed synthetic replay data, requires no credentials and
+makes no network requests. See `examples/research-report.synthetic.json` for its
+reproducible output. This file is an example, not a live broker snapshot.
+
+`build_report(ticker, as_of=..., quote=..., daily_bars=..., session_bars=...,
+baseline_sessions=...)` joins validated observations into schema version 1.0.
+Output contains quote freshness, daily scan features, intraday metrics, four
+separate setup results, and explicit risk/decision availability. Empty optional
+inputs report unavailable; mixed ticker/source inputs, future bars and malformed
+session slices fail. Daily and session bars may be replay while a quote is live;
+provenance remains visible rather than silently relabeled.
+
+For read-only provider retrieval:
+
+```python
+from tori_taurus.report import report_from_provider
+
+report = report_from_provider(provider_with_sessions, "AAPL", as_of=as_of,
+                              history_start=history_start, session_start=session_start)
+```
+
+Use a calendar-labeled provider for intraday retrieval and provide timezone-aware
+request dates. The caller controls the intraday slice and must request one session
+date. The function fetches a quote, daily history and intraday bars, selecting the
+requested known session (regular by default). It does not automatically remove
+unfinished bars: invalid slices fail so callers must choose completed-bar boundaries.
+For matched-time relative volume, fetch earlier slices and supply them to build_report;
+the simple provider helper does not fetch those baseline sessions.
+
+`as_of` is an explicit evaluation clock, not a claim of historical API availability.
+Stale session observations can retain descriptive features while setup states are
+unavailable. A stale/delayed/replay quote fails the live freshness gate. Reports
+always remain RESEARCH_ONLY with ready_to_trade=false because risk/account/entry
+inputs are not yet evaluated. No score or broker order is fabricated. The complete
+market-data-to-risk vertical slice remains unfinished until the risk engine is added.
