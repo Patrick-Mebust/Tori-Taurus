@@ -300,4 +300,40 @@ bars: callers must provide appropriate data. Split adjustment and feed coverage
 must be consistent; IEX volume is single-exchange volume. A partial daily bar cannot
 be compared fairly with full-day volume without a time-of-day baseline. Scanner
 matches are research candidates; they do not imply fresh prices or a trade signal.
-Intraday relative volume, volume acceleration, and session high/low remain pending.
+Intraday observed-window metrics are available below.
+
+## Intraday volume and observed session ranges
+
+```python
+from datetime import datetime, timezone
+from tori_taurus.indicators import session_features
+
+features = session_features(current_session_bars, historical_session_bar_lists,
+                            as_of=datetime.now(timezone.utc), min_sessions=5,
+                            acceleration_window=3)
+```
+
+Supply one chronological, contiguous slice of a known intraday session and a list
+of earlier session slices. Timestamps must represent bar starts. A current bar is
+eligible only after its full interval has elapsed by `as_of`; partial bars fail.
+Inputs must match ticker, interval, source/feed, mode, and session label.
+
+Relative volume compares cumulative volume in the current supplied slice against
+the mean volume in exactly those Eastern wall-clock slots in prior sessions.
+DST changes UTC offsets, but matching remains by local time. Extra historical
+slots are excluded; sessions missing a required slot do not contribute. Duplicate
+baseline dates and same-day/future baselines fail. At least `min_sessions` matching
+baselines are required; too few or a zero baseline produces None with a reason.
+
+Volume acceleration is the volume sum in the latest N bars divided by the sum in
+the immediately preceding N bars (N=`acceleration_window`). These equal-duration
+windows are contiguous. Insufficient bars or a zero prior window produces None.
+This is a window-volume ratio, not a derivative or an annualized rate.
+
+Output includes observed high/low, volume, bar-based VWAP, comparison-session counts,
+source/mode, check time and exact coverage start/end. High/low and VWAP cover only
+the supplied slice; callers must fetch the whole intended session before treating
+them as full-session metrics. Missing no-trade bars are never invented as zeros.
+The function does not validate bars against an exchange calendar or detect halts;
+use the calendar decorator for labels and keep feed-coverage limits in view.
+All outputs remain research features, with no order execution or entry decision.

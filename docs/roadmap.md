@@ -34,10 +34,10 @@ Goal: create one trustworthy interface for market data.
 - [x] RSI
 - [x] ATR
 - [x] Daily relative volume against preceding daily-bar baseline
-- [ ] Intraday time-of-day relative volume
-- [ ] Volume acceleration
+- [x] Intraday relative volume (matched Eastern-time slots; explicit baseline coverage)
+- [x] Volume acceleration (adjacent equal-duration bar-window ratio)
 - [x] Daily opening gap metric
-- [ ] Session high/low metrics
+- [x] Observed session-slice high/low metrics (explicit coverage)
 
 **Milestone:** Tori produces a deterministic feature set for a candidate.
 
