@@ -47,8 +47,10 @@ Goal: create one trustworthy interface for market data.
 - [ ] breakout/retest
 - [ ] first pullback
 - [ ] higher-low continuation
-- [ ] excessive-extension flag
-- [ ] explicit confirmation and invalidation
+- [x] VWAP extension limit and explicit EXTENDED state
+- [ ] Extension rules for other setups
+- [x] Explicit confirmation/invalidation for VWAP reclaim
+- [ ] Confirmation/invalidation for remaining setups
 
 **Milestone:** Tori can say *what setup is present and why* without relying on an LLM guess.
 

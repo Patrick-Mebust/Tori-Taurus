@@ -1,4 +1,5 @@
-"""Rule-based setup classification, confirmation, and invalidation.
+"""Rule-based setup classification, confirmation, and invalidation."""
 
-Scaffold only; implementation is tracked in the development roadmap.
-"""
+from .vwap_reclaim import ReclaimConfig, evaluate_vwap_reclaim
+
+__all__ = ["ReclaimConfig", "evaluate_vwap_reclaim"]

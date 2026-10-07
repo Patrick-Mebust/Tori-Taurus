@@ -337,3 +337,38 @@ them as full-session metrics. Missing no-trade bars are never invented as zeros.
 The function does not validate bars against an exchange calendar or detect halts;
 use the calendar decorator for labels and keep feed-coverage limits in view.
 All outputs remain research features, with no order execution or entry decision.
+
+## Phase 3: VWAP reclaim research state
+
+```python
+from datetime import datetime, timezone
+from tori_taurus.setups import ReclaimConfig, evaluate_vwap_reclaim
+
+state = evaluate_vwap_reclaim(completed_session_bars,
+                             as_of=datetime.now(timezone.utc), config=ReclaimConfig())
+```
+
+Rule version 1.0 processes a supplied contiguous intraday session slice in order.
+The first reclaim occurs when the previous close was at/below its cumulative
+bar-based VWAP and the next close is strictly above its own cumulative VWAP.
+That crossing enters WATCH, not immediate confirmation. The anchor is the lower
+low of the preceding and reclaim bars; the reclaim high is the confirmation level.
+A later completed close must exceed both that high and current VWAP to confirm.
+The default maximum close extension above VWAP is 3%; excessive extension reports
+EXTENDED and blocks confirmation until a later bar satisfies the limit.
+
+Any later bar low at/below the anchor, or close strictly below current VWAP,
+invalidates first, even if its high also exceeds confirmation. INVALIDATED stays
+terminal for this first-reclaim evaluation; no same-slice re-entry is inferred.
+Once confirmed, the state holds until invalidation or excessive extension.
+Output records trigger/confirmation/invalidation timestamps, levels, source/mode,
+coverage, rule version and explicit conditions. The anchor is a research threshold,
+not an active broker stop, guaranteed fill, risk budget or position-size decision.
+
+Only completed bars may enter. Latest bar-end age must be within the configurable
+observation-age budget (default two minutes); stale data fails explicitly.
+The caller must supply the intended session history for meaningful cumulative VWAP.
+Partial slices can change results. A zero-volume slice reports UNAVAILABLE.
+This is a proposed deterministic rule with synthetic transition tests, not a
+backtested strategy or evidence of profitable performance. Breakout/retest,
+first-pullback, and higher-low continuation rules remain pending.
