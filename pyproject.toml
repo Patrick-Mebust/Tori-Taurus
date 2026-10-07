@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tori-taurus"
+version = "0.1.0"
+description = "AI-assisted quantitative trading research and risk-management platform"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[project.urls]
+Repository = "https://github.com/Patrick-Mebust/Tori-Taurus"
+Issues = "https://github.com/Patrick-Mebust/Tori-Taurus/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["tori_taurus*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100

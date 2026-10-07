@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Tori Taurus: local credentials and private research/account data
+.env.*
+!.env.example
+secrets/
+credentials/
+*.pem
+*.key
+/data/private/
+/exports/
+/logs/

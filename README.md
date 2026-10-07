@@ -73,6 +73,26 @@ Tori-Taurus/
 └── README.md
 ```
 
+## Local development
+
+Requires Python 3.11 or newer. From the repository root:
+
+```sh
+python -m venv .venv
+# Windows PowerShell:
+.venv\\Scripts\\Activate.ps1
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -e ".[dev]"
+python -m pytest
+python -m ruff check src tests
+```
+
+The module directories are scaffolding; market-data adapters and trading logic
+are not implemented yet. Imports do not connect to a broker or read credentials.
+Copy `.env.example` to `.env` only when configuring a future adapter. The template
+contains blank credentials; keep real values in your local environment or a
+secrets manager. Store private exports under `data/private/` or `exports/`.
+
 ## Roadmap
 
 - [x] Initialize repository
