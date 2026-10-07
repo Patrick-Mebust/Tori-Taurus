@@ -45,7 +45,7 @@ Goal: create one trustworthy interface for market data.
 
 - [x] VWAP reclaim
 - [x] Breakout/retest research rule v1 (frozen seed level; distinct-bar transitions)
-- [ ] first pullback
+- [x] First-pullback research rule v1 (defined impulse/depth/window; synthetic transitions)
 - [ ] higher-low continuation
 - [x] VWAP extension limit and explicit EXTENDED state
 - [ ] Extension rules for other setups

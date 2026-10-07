@@ -406,3 +406,31 @@ of an economically meaningful resistance level. Stale or unfinished bars fail;
 zero observed volume or insufficient seed/observation history is unavailable.
 No active stop or order is created. This proposed rule has synthetic transition
 tests and remains unbacktested. First-pullback and higher-low continuation are pending.
+
+## First-pullback research state
+
+`evaluate_first_pullback(bars, as_of=..., config=PullbackConfig())` evaluates one
+completed, contiguous, labeled intraday session slice. The default impulse is the
+initial three bars with strictly rising closes, nonzero volumes, and at least a
+5% gain from first to last close. Unqualified seeds report NO_SETUP; short seeds
+report UNAVAILABLE. A qualifying seed enters IMPULSE.
+
+Until the first lower close, the observed impulse peak may grow. The first
+nonzero-volume lower close starts WATCH and freezes the peak and first pullback
+high. The impulse base is the lowest low in the initial seed. The invalidation
+anchor is peak minus 50% (configurable) of the peak-to-base range. Any low at/below
+that anchor, including on the first pullback bar, invalidates before confirmation.
+
+A distinct later nonzero-volume close strictly above the first pullback high
+confirms, provided it is within the default 3% extension above the frozen peak.
+Confirmation must occur within five later bars by default; later observations
+report EXPIRED if still unconfirmed. INVALIDATED and EXPIRED are terminal for
+this first-event evaluation. EXTENDED blocks new confirmation. Confirmed state
+holds until anchor invalidation or excessive extension.
+
+Output includes impulse base/peak, confirmation/anchor levels, transition times,
+parameters, source/mode and exact coverage. Stale or unfinished bars fail under
+the same two-minute default observation-age policy as other setup rules.
+This v1.0 rule is proposed research logic with synthetic transition tests, not a
+validated profitable strategy. The anchor is not a broker stop or a position-size
+calculation. Higher-low continuation remains pending.
