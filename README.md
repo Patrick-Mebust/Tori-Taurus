@@ -87,8 +87,8 @@ python -m pytest
 python -m ruff check src tests
 ```
 
-The module directories are scaffolding; market-data adapters and trading logic
-are not implemented yet. Imports do not connect to a broker or read credentials.
+The market-data package now includes validated models, a provider contract,
+freshness checks, and a read-only CSV replay adapter. Other modules remain scaffolding. Imports do not connect to a broker or read credentials.
 Copy `.env.example` to `.env` only when configuring a future adapter. The template
 contains blank credentials; keep real values in your local environment or a
 secrets manager. Store private exports under `data/private/` or `exports/`.
@@ -116,8 +116,141 @@ Tori Taurus is a research and decision-support project. It does not guarantee pr
 
 ## Tech direction
 
-**Python · REST/WebSocket APIs · pandas/polars · quantitative indicators · backtesting · LLM-assisted analysis · testing · GitHub Actions · cloud deployment**
+**Python Â· REST/WebSocket APIs Â· pandas/polars Â· quantitative indicators Â· backtesting Â· LLM-assisted analysis Â· testing Â· GitHub Actions Â· cloud deployment**
 
 ---
 
 Built as an evolving engineering and quantitative research project.
+
+## Market data core (Phase 1 started)
+
+```python
+from pathlib import Path
+from datetime import datetime, timezone
+from tori_taurus.market_data import CsvProvider
+
+provider = CsvProvider(Path("data/private/quotes.csv"), Path("data/private/bars.csv"))
+quote = provider.get_quote("AAPL")
+bars = provider.get_bars("AAPL", datetime(2026, 10, 1, tzinfo=timezone.utc),
+                         datetime(2026, 10, 8, tzinfo=timezone.utc), interval="1d")
+```
+
+CSV headers:
+- Quotes: `symbol,timestamp,bid,ask`
+- Bars: `symbol,timestamp,open,high,low,close,volume,interval`
+
+Timestamps require an explicit timezone and normalize to UTC. Prices use Decimal.
+Bars use inclusive start and exclusive end; results sort by timestamp and duplicate
+bars are rejected. Supported intervals: 1m, 5m, 15m, 1h, 1d. An optional `session`
+column accepts premarket, regular, postmarket, or unknown. Missing sessions remain
+unknown unless you opt into the calendar decorator below.
+
+CSV records always report source=csv and mode=replay, even if the input says live.
+`validate_freshness(quote, now=..., max_age=...)` requires live provenance and rejects
+stale or future timestamps. Historical records do not need to pass live freshness.
+A read-only Alpaca REST adapter is implemented below. Authenticated live verification
+remains open in roadmap issue #1; calendar classification is available below.
+
+## Alpaca market data
+
+The adapter follows Alpaca's [latest quote](https://docs.alpaca.markets/us/reference/stocklatestquotesingle-1)
+and [historical bars](https://docs.alpaca.markets/us/reference/stockbarsingle-1) contracts.
+Supply credentials through your local environment; importing the package never loads
+credentials or makes requests. The adapter does not read `.env` automatically.
+
+```python
+import os
+from datetime import datetime, timedelta, timezone
+from tori_taurus.market_data import AlpacaProvider, validate_freshness
+
+provider = AlpacaProvider(os.environ["ALPACA_API_KEY"],
+                          os.environ["ALPACA_API_SECRET"], feed="iex")
+quote = provider.get_quote("AAPL")
+validate_freshness(quote, now=datetime.now(timezone.utc), max_age=timedelta(seconds=60))
+print(quote)  # market fields only; no credentials
+```
+
+The supported feeds are `iex` and `sip`. IEX covers one exchange; it is not a
+consolidated market quote or total market volume. SIP access depends on your
+Alpaca entitlements. Sources remain explicit (`alpaca:iex` or `alpaca:sip`).
+A latest quote has live provenance but must still pass the caller's freshness
+policy before use. Historical bars are raw/unadjusted and labeled replay.
+Provider timestamps normalize to UTC; session stays unknown unless wrapped with SessionProvider.
+
+Historical retrieval follows all page tokens, sorts bars, rejects duplicates,
+and enforces inclusive start/exclusive end. Symbol remapping is disabled (`asof=-`).
+The default 100-page cap rejects incomplete results; narrow your range or explicitly
+configure `max_pages` when needed. Requests have a finite timeout, disable redirects,
+and expose sanitized HTTP/error messages. There are no automatic retries: callers
+must decide how to handle rate limits or temporary failures.
+
+Tests use synthetic mocked responses and never contact Alpaca. An authenticated
+live smoke test has not been performed. No trading/order endpoints are included.
+
+## Optional session classification
+
+Install `python -m pip install -e ".[dev,calendar]"` to enable the calendar package.
+Base imports and market-data adapters do not require this extra.
+
+```python
+from tori_taurus.market_data import NyseSessions, SessionProvider
+
+sessions = NyseSessions()
+provider_with_sessions = SessionProvider(provider, sessions)
+quote = provider_with_sessions.get_quote("AAPL")
+print(quote.session)
+```
+
+The decorator works with either CSV or Alpaca providers and preserves prices,
+timestamps, source/feed labels, and live/replay provenance. Quotes and intraday
+bars classify their record timestamps as premarket, regular, postmarket, or closed.
+Daily bars remain unknown because a daily aggregate spans multiple hours.
+
+This is an explicit NYSE-family daytime schedule convention, using
+[pandas-market-calendars](https://pandas-market-calendars.readthedocs.io/en/latest/usage.html).
+It follows Eastern local dates, DST, holidays, special closures, and early-close
+pre/open/close/post boundaries. Boundary starts are inclusive and ends exclusive.
+For example, November 27, 2026 closes regular trading at 13:00 ET and the extended
+schedule at 17:00 ET, consistent with the
+[NYSE calendar](https://www.nyse.com/trade/hours-calendars).
+
+A session label describes a record's timestamp; it does not report live market
+status, a symbol halt, or whether your broker/feed supports that session. Overnight
+trading, other venue calendars, and emergency closures absent from the installed
+calendar package are outside this convention. `closed` means outside this schedule.
+Update the calendar package as published rules change. Per-instance date schedules
+are cached with a bounded 366-day cache and require no network requests.
+
+## Repeatable live smoke check
+
+After installing the package, run:
+
+```sh
+tori-market-check AAPL --feed iex --sessions
+# Equivalent without the installed command:
+python -m tori_taurus.market_data.smoke AAPL --feed iex --sessions
+```
+
+Set `ALPACA_API_KEY` and `ALPACA_API_SECRET` in your local environment first.
+The command never reads `.env` automatically and never accepts credentials as
+command-line arguments. Omit `--sessions` if the optional calendar extra is absent.
+
+Output is a JSON report with a UTC check time, quote source/feed, timestamp, decimal
+bid/ask, freshness, and history count/range. The default checks a quote against a
+60-second age budget and retrieves the previous seven calendar days of daily bars.
+Use `--max-age-seconds` to choose a nonnegative freshness budget and `--history-days`
+(1–30) to choose the history window. History must be nonempty, ordered, unique,
+inside the requested range, and match the requested ticker and quote source.
+
+Exit codes:
+- `0`: live quote passed freshness and historical data passed validation.
+- `1`: provider/data failure or quote not current.
+- `2`: check not run due to missing credentials or invalid configuration.
+
+A failed stale quote can be normal after market close; it does not pass as live.
+The report validates data transport and shape, not price accuracy, historical
+completeness, trade suitability, or broker execution. No orders are submitted.
+
+Development verification used synthetic responses. The local command reported
+`not_run` because Alpaca environment credentials were absent. Authenticated live
+verification remains pending; mocked test success is not a live-data refresh.

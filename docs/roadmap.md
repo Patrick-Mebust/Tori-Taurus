@@ -13,12 +13,16 @@
 
 Goal: create one trustworthy interface for market data.
 
-- [ ] Define quote/bar data models
-- [ ] Define provider interface
-- [ ] Add first provider adapter
-- [ ] Normalize timestamps and sessions
-- [ ] Add freshness validation
-- [ ] Add unit tests
+- [x] Define quote/bar data models
+- [x] Define provider interface
+- [x] Add first provider adapter (CSV replay)
+- [x] Add read-only live provider adapter (Alpaca REST; mocked-response validation)
+- [x] Add repeatable read-only quote/history smoke command and offline acceptance tests
+- [ ] Verify authenticated real quote/bar responses (local credentials required)
+- [x] Normalize aware timestamps to UTC
+- [x] Optional NYSE-family calendar classification (holidays, early closes, DST; daily bars unknown)
+- [x] Add freshness validation
+- [x] Add unit tests
 
 **Milestone:** Given a ticker, Tori can return validated current/historical market data through one interface.
 
