@@ -73,10 +73,10 @@ Goal: create one trustworthy interface for market data.
 
 ## Phase 6 — Risk + FOMO Guard
 
-- [ ] dollar-risk calculation
-- [ ] account-risk %
-- [ ] position sizing
-- [ ] concentration warnings
+- [x] dollar-risk calculation (user-supplied long-share planning inputs)
+- [x] account-risk % (user-supplied long-share planning inputs)
+- [x] position sizing (user-supplied long-share planning inputs)
+- [x] concentration warnings (user-supplied long-share planning inputs)
 - [ ] cooldown after exit
 - [ ] unsupported averaging-down flag
 - [ ] chase/extension warning

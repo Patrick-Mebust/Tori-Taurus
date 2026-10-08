@@ -1,4 +1,7 @@
 """Deterministic position sizing and account-risk checks.
 
-Scaffold only; implementation is tracked in the development roadmap.
 """
+
+from .core import RiskInputs, evaluate_risk
+
+__all__ = ["RiskInputs", "evaluate_risk"]
