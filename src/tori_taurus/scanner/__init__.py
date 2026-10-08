@@ -1,4 +1,7 @@
 """Configurable candidate discovery from deterministic market filters.
 
-Scaffold only; implementation is tracked in the development roadmap.
 """
+
+from .core import ScanConfig, evaluate_daily, scan_daily
+
+__all__ = ["ScanConfig", "evaluate_daily", "scan_daily"]

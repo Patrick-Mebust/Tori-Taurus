@@ -28,20 +28,22 @@ Goal: create one trustworthy interface for market data.
 
 ## Phase 2 — Scanner + Indicators
 
-- [ ] Under-$5 configurable scanner
-- [ ] VWAP
-- [ ] EMA 5 / EMA 9 / EMA 20
-- [ ] RSI
-- [ ] ATR
-- [ ] Relative volume
-- [ ] Volume acceleration
-- [ ] Session high/low and gap metrics
+- [x] Under-$5 configurable daily scanner (caller-supplied universe)
+- [x] VWAP
+- [x] EMA 5 / EMA 9 / EMA 20
+- [x] RSI
+- [x] ATR
+- [x] Daily relative volume against preceding daily-bar baseline
+- [x] Intraday relative volume (matched Eastern-time slots; explicit baseline coverage)
+- [x] Volume acceleration (adjacent equal-duration bar-window ratio)
+- [x] Daily opening gap metric
+- [x] Observed session-slice high/low metrics (explicit coverage)
 
 **Milestone:** Tori produces a deterministic feature set for a candidate.
 
 ## Phase 3 — Setup State
 
-- [ ] VWAP reclaim
+- [x] VWAP reclaim
 - [ ] breakout/retest
 - [ ] first pullback
 - [ ] higher-low continuation
