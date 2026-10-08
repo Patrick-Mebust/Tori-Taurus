@@ -175,11 +175,16 @@
     "status": "unavailable",
     "reason": "account_and_trade_plan_not_supplied"
   },
+  "guardrails": {
+    "status": "unavailable",
+    "reason": "guardrail_context_not_supplied"
+  },
   "decision": {
     "state": "RESEARCH_ONLY",
     "ready_to_trade": false,
     "blockers": [
       "risk_not_evaluated",
+      "guardrails_not_evaluated",
       "no_fresh_live_quote"
     ]
   },

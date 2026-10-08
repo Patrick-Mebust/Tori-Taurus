@@ -1,6 +1,4 @@
-"""Configurable candidate discovery from deterministic market filters.
-
-"""
+"""Configurable candidate discovery from deterministic market filters."""
 
 from .core import ScanConfig, evaluate_daily, scan_daily
 

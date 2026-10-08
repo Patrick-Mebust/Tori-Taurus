@@ -4,6 +4,7 @@ import argparse
 import json
 from datetime import UTC, datetime, timedelta
 
+from .behavior.guardrails import GuardrailInputs, evaluate_guardrails
 from .indicators import session_features
 from .market_data import Bar, MarketDataProvider, Quote, validate_freshness
 from .market_data.models import symbol, utc
@@ -27,6 +28,7 @@ def build_report(
     baseline_sessions: list[list[Bar]] | None = None,
     max_quote_age: timedelta = timedelta(seconds=60),
     risk_inputs: RiskInputs | None = None,
+    guardrail_inputs: GuardrailInputs | None = None,
 ) -> dict:
     """Join observations without promoting replay/stale data to a live decision."""
     ticker, as_of = symbol(ticker), utc(as_of)
@@ -93,6 +95,12 @@ def build_report(
             raise ValueError("Risk plan ticker mismatch")
         risk = evaluate_risk(risk_inputs)
         blockers = ["risk_inputs_unverified", "stop_not_broker_verified"] + risk["blockers"]
+    guardrails = {"status": "unavailable", "reason": "guardrail_context_not_supplied"}
+    if risk_inputs is not None and guardrail_inputs is not None:
+        guardrails = evaluate_guardrails(risk_inputs, guardrail_inputs, as_of=as_of)
+        blockers += guardrails["blockers"] + guardrails["unevaluated"]
+    else:
+        blockers.append("guardrails_not_evaluated")
     if not quote_data["fresh"]:
         blockers.append("no_fresh_live_quote")
     if not session_bars:
@@ -110,6 +118,7 @@ def build_report(
         "intraday": intraday,
         "setups": setups,
         "risk": risk,
+        "guardrails": guardrails,
         "decision": {"state": "RESEARCH_ONLY", "ready_to_trade": False, "blockers": blockers},
         "note": "No trade score, risk approval, broker stop or order is implied.",
     }

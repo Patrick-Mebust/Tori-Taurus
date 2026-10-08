@@ -52,7 +52,7 @@ def evaluate_vwap_reclaim(
                 extension = (bar.close / current_vwap - 1) * 100
                 if extension > config.max_extension_percent:
                     state, reason = "EXTENDED", "extension_above_limit"
-                elif bar.close > trigger_high and bar.close > current_vwap:
+                elif bar.volume > 0 and bar.close > trigger_high and bar.close > current_vwap:
                     state, reason = "CONFIRMED", "later_close_above_reclaim_high_and_vwap"
                     if confirmed is None:
                         confirmed = bar.timestamp
@@ -62,6 +62,8 @@ def evaluate_vwap_reclaim(
                     state, reason = "CONFIRMED", "confirmation_holds_until_invalidation"
         elif (
             index > 0
+            and bar.volume > 0
+            and bars[index - 1].volume > 0
             and previous_vwap is not None
             and current_vwap is not None
             and bars[index - 1].close <= previous_vwap

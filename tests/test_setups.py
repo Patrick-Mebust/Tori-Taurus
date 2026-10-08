@@ -125,3 +125,12 @@ def test_invalid_config_and_unknown_session():
         ReclaimConfig(max_observation_age=timedelta(seconds=-1))
     with pytest.raises(ValueError):
         result([replace(b, session="unknown") for b in sequence()])
+
+
+def test_zero_volume_cannot_trigger_or_confirm_reclaim():
+    data = sequence()
+    data[1] = replace(data[1], volume=0)
+    assert result(data)["trigger_at"] is None
+    data = sequence()
+    data[2] = replace(data[2], volume=0)
+    assert result(data)["confirmed_at"] is None

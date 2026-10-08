@@ -207,12 +207,17 @@
     "input_basis": "user_supplied_unverified_account_and_plan",
     "note": "Long shares only; planned stop loss excludes gaps, slippage, fees and fill failure. No order or stop is placed."
   },
+  "guardrails": {
+    "status": "unavailable",
+    "reason": "guardrail_context_not_supplied"
+  },
   "decision": {
     "state": "RESEARCH_ONLY",
     "ready_to_trade": false,
     "blockers": [
       "risk_inputs_unverified",
       "stop_not_broker_verified",
+      "guardrails_not_evaluated",
       "no_fresh_live_quote"
     ]
   },
