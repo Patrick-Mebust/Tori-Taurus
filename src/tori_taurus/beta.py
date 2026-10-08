@@ -245,7 +245,7 @@ def evaluate_payload(payload: dict, *, now: datetime | None = None) -> dict:
         else "RESEARCH ONLY"
     )
     report["beta"] = {
-        "version": "0.2.0b1",
+        "version": "0.3.0b1",
         "mode": mode,
         "requested_at": now.isoformat(),
         "review_status": review,
@@ -295,17 +295,19 @@ class BetaHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._trusted():
             self._send(403, {"error": "Local origin required"})
-        elif self.path == "/":
+        elif self.path in {"/", "/planner"}:
             self._send(
                 200,
-                files("tori_taurus").joinpath("beta.html").read_text(encoding="utf-8"),
+                files("tori_taurus")
+                .joinpath("scanner.html" if self.path == "/" else "beta.html")
+                .read_text(encoding="utf-8"),
                 "text/html",
             )
         elif self.path == "/api/status":
             self._send(
                 200,
                 {
-                    "version": "0.2.0b1",
+                    "version": "0.3.0b1",
                     "credentials_configured": credentials_available(),
                     "live_verified": False,
                     "default_mode": "demo",
@@ -323,7 +325,7 @@ class BetaHandler(BaseHTTPRequestHandler):
         ):
             self._send(403, {"error": "Same-origin JSON request required"})
             return
-        if self.path != "/api/report":
+        if self.path not in {"/api/report", "/api/scan"}:
             self._send(404, {"error": "Not found"})
             return
         try:
@@ -331,7 +333,12 @@ class BetaHandler(BaseHTTPRequestHandler):
             if not 0 < length <= 16384:
                 raise ValueError("Invalid request length")
             payload = json.loads(self.rfile.read(length))
-            self._send(200, evaluate_payload(payload))
+            if self.path == "/api/scan":
+                from .scanner.dashboard import scan_payload
+
+                self._send(200, scan_payload(payload))
+            else:
+                self._send(200, evaluate_payload(payload))
         except MarketDataError as exc:
             self._send(422, {"error": str(exc), "live_verified": False})
         except (ValueError, TypeError, KeyError, ArithmeticError, AttributeError):

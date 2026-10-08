@@ -296,3 +296,24 @@ def test_live_connection_requires_fresh_live_quote(monkeypatch):
     assert not beta.evaluate_payload({"mode": "live", "ticker": "TEST"}, now=now)["beta"][
         "live_connection_verified"
     ]
+
+
+def test_scanner_endpoint_returns_candidates_without_ticker(local_server):
+    status, _, body = request(
+        local_server,
+        "POST",
+        "/api/scan",
+        '{"mode":"demo"}',
+        **{"Origin": f"http://127.0.0.1:{local_server}", "Content-Type": "application/json"},
+    )
+    assert status == 200
+    result = json.loads(body)
+    assert len(result["candidates"]) == 4
+    assert result["mode"] == "demo"
+
+
+def test_root_is_scanner_and_manual_planner_is_secondary(local_server):
+    _, _, root = request(local_server, "GET", "/")
+    _, _, planner = request(local_server, "GET", "/planner")
+    assert b"Candidate watchlist" in root
+    assert b"Your trade plan" in planner

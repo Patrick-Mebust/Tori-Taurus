@@ -46,6 +46,9 @@ class AlpacaProvider:
 
     def _request(self, path: str, params: dict) -> dict:
         url = "https://data.alpaca.markets/v2/stocks/" + path + "?" + urlencode(params)
+        return self._get_json(url)
+
+    def _get_json(self, url: str) -> dict:
         request = Request(url, headers=self._headers)
         try:
             with self._opener.open(request, timeout=self.timeout) as response:

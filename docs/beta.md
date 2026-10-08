@@ -1,4 +1,4 @@
-# Tori Taurus local beta 0.2.0b1
+# Tori Taurus local beta 0.3.0b1 — scanner dashboard
 
 ## Try it
 
@@ -6,15 +6,17 @@ Requires Python 3.11 or newer. On Windows, extract the entire beta ZIP into a fo
 
 On other systems, create a virtual environment, install `pip install -e '.[calendar]'`, then run `tori-beta`. Use `tori-beta --port 8766` if the default port is occupied.
 
-Select **Demo**, enter a ticker and a proposed plan, then click **Analyze my plan**. Every demo ticker uses the same fabricated series at a fixed historical timestamp. These are not ticker prices. Request time and market evaluation time are shown separately.
+The home screen opens a demo scanner with four clearly fabricated stocks. Click **Scan for stocks**, then select a candidate to inspect entry, stop, illustrative 2R target and setup rationale. No ticker or entry price is required. The original manual planner remains at `/planner`.
 
-The screen puts planned dollar loss, account risk, allowable shares, concentration, buying power and stop status before setup states. Changes to inputs invalidate the displayed report. It evaluates daily-loss headroom, time since exit, entry extension and unsupported averaging down. Context is manually entered and unverified. Daily losses mean gross realized losses; wins do not reset the budget. The chase reference is the last supplied intraday close.
+Expand **My account & holdings** once per browser session to enter equity, buying power, limits and optional existing positions. Tori then calculates each candidate's share ceiling, dollar risk, account risk, concentration, remaining buying power, and projected average after an add. Without supplied holdings it labels the calculation a new-position scenario; it does not know your real cost basis. Each candidate uses the same available cash independently and must not be combined as a portfolio allocation. Settings changes invalidate results. Optional auto-refresh starts the next scan 60 seconds after the previous scan completes.
+
+The screen puts planned dollar loss, account risk, allowable shares, concentration, buying power and stop status before setup states. Changes to inputs invalidate the displayed report. The scanner evaluates daily-loss headroom, entry extension and unsupported averaging down. Exit-time cooldown context is available in the secondary manual planner. Context is manually entered and unverified. Daily losses mean gross realized losses; wins do not reset the budget. The chase reference is the last supplied intraday close.
 
 ## Connect Alpaca locally
 
 Set `ALPACA_API_KEY` and `ALPACA_API_SECRET` in the environment of the process launching Tori. Restart the server after setting them. Never paste keys into chat, source code, reports or GitHub. A `.env` file is not automatically loaded. The application does not collect credentials through its browser form.
 
-Select **Live** and choose IEX or SIP, then use a real ticker and analyze. IEX represents one exchange, not consolidated volume. SIP requires the appropriate Alpaca entitlement. The connection is only marked verified on a successful fresh quote in that response; account access and order execution are not tested. An old quote remains stale even when authentication succeeds.
+Select **Live Alpaca scan**, choose IEX or SIP, then click **Scan for stocks**. IEX represents one exchange, not consolidated volume. SIP requires the appropriate Alpaca entitlement. Each quote retains its timestamp and freshness result; account access and order execution are not tested. An old quote remains stale even when authentication succeeds.
 
 Daily aggregates exclude today's unfinished daily bar. Intraday bars include completed regular-session intervals only. Premarket, postmarket, closed sessions, holidays, stale bars and sparse/missing intervals may yield unavailable setup states. No live same-time historical volume baseline is collected in this release; relative volume therefore remains unavailable. Timestamp calendar classification does not verify halts, venue status, liquidity or broker eligibility.
 
@@ -30,3 +32,11 @@ Daily aggregates exclude today's unfinished daily bar. Intraday bars include com
 ## Validation boundaries
 
 Automated tests cover deterministic risk/guardrail boundaries, synthetic/mocked providers, malformed inputs, HTTP origin checks, incomplete market data and missing credentials. Browser demo testing and a packaged install are separate checks. Mocked providers never establish authenticated access. Actual Alpaca verification requires locally configured credentials and a successful fresh live quote.
+
+## Scanner coverage and conditional prices
+
+Live discovery combines Alpaca's top 100 most-active stocks and top 50 gainers, deduplicates symbols, and filters snapshots to prices from $0.01 to below $5, positive change from the previous daily close, and at least 100,000 shares of day volume. It inspects at most the top 20 matches by snapshot change. This is bounded discovery, not a scan of every stock. Screeners use SIP data; detailed analysis uses the selected feed. Movers retain the prior session before market open. Securities can include ETFs; common-stock type is not verified. See [Alpaca most-actives](https://docs.alpaca.markets/us/reference/mostactives-1) and [movers](https://docs.alpaca.markets/us/reference/movers-1).
+
+The watchlist ranks valid confirmed setups first, then watch setups, then blocked/unavailable results; percent change breaks ties. This is not a probability or profitability score. An entry requires a WATCH or CONFIRMED setup with observed confirmation and invalidation levels. Entry is the greater of ask and confirmation plus a planning increment, rounded upward; stop is below invalidation. The increment is $0.01 above $1, or $0.0001 below $1, and is not exchange tick-size certification. The 2R target is arithmetic, not a forecast.
+
+Live plans require a fresh regular-session quote, a valid positive bid/ask and a spread of at most 2%. Stale, invalid, missing or incomplete observations do not produce prices. Quotes that become stale during a scan lose their plan before the response is returned. One live scan runs at a time; a time budget stops additional candidate requests, with uninspected counts shown. Failed candidates are reported individually. No live news, float, halt validation or intraday historical relative-volume baselines are supplied.
