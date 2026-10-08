@@ -337,3 +337,126 @@ them as full-session metrics. Missing no-trade bars are never invented as zeros.
 The function does not validate bars against an exchange calendar or detect halts;
 use the calendar decorator for labels and keep feed-coverage limits in view.
 All outputs remain research features, with no order execution or entry decision.
+
+## Phase 3: VWAP reclaim research state
+
+```python
+from datetime import datetime, timezone
+from tori_taurus.setups import ReclaimConfig, evaluate_vwap_reclaim
+
+state = evaluate_vwap_reclaim(completed_session_bars,
+                             as_of=datetime.now(timezone.utc), config=ReclaimConfig())
+```
+
+Rule version 1.0 processes a supplied contiguous intraday session slice in order.
+The first reclaim occurs when the previous close was at/below its cumulative
+bar-based VWAP and the next close is strictly above its own cumulative VWAP.
+That crossing enters WATCH, not immediate confirmation. The anchor is the lower
+low of the preceding and reclaim bars; the reclaim high is the confirmation level.
+A later completed close must exceed both that high and current VWAP to confirm.
+The default maximum close extension above VWAP is 3%; excessive extension reports
+EXTENDED and blocks confirmation until a later bar satisfies the limit.
+
+Any later bar low at/below the anchor, or close strictly below current VWAP,
+invalidates first, even if its high also exceeds confirmation. INVALIDATED stays
+terminal for this first-reclaim evaluation; no same-slice re-entry is inferred.
+Once confirmed, the state holds until invalidation or excessive extension.
+Output records trigger/confirmation/invalidation timestamps, levels, source/mode,
+coverage, rule version and explicit conditions. The anchor is a research threshold,
+not an active broker stop, guaranteed fill, risk budget or position-size decision.
+
+Only completed bars may enter. Latest bar-end age must be within the configurable
+observation-age budget (default two minutes); stale data fails explicitly.
+The caller must supply the intended session history for meaningful cumulative VWAP.
+Partial slices can change results. A zero-volume slice reports UNAVAILABLE.
+This is a proposed deterministic rule with synthetic transition tests, not a
+backtested strategy or evidence of profitable performance. Breakout/retest,
+first-pullback, and higher-low continuation rules remain pending.
+
+## Breakout/retest research state
+
+```python
+from datetime import datetime, timezone
+from tori_taurus.setups import BreakoutConfig, evaluate_breakout_retest
+
+state = evaluate_breakout_retest(completed_session_bars,
+                                as_of=datetime.now(timezone.utc),
+                                config=BreakoutConfig(lookback_bars=5))
+```
+
+Rule v1.0 freezes resistance at the highest high of the initial `lookback_bars`
+(default five). Only subsequent bars can trigger the first breakout: a nonzero-volume
+close strictly above resistance. A distinct later bar must retest the level's upper
+tolerance band and close at/above resistance while holding above the lower anchor.
+A still later nonzero-volume close strictly above the retest high confirms.
+The tolerance is 0.5% by default; the anchor is resistance * (1-tolerance/100).
+The maximum close extension above resistance is 3% by default.
+
+States are NO_SETUP, WATCH, RETEST, CONFIRMED, EXTENDED, INVALIDATED, or UNAVAILABLE.
+After breakout, any later low at/below the anchor or close below resistance
+invalidates before retest/confirmation. Invalidation remains terminal for this
+first-breakout evaluation. Extension blocks new confirmation, retaining the
+breakout/retest timestamps so a later qualifying bar may confirm. Once confirmed,
+confirmation holds until invalidation or excessive extension.
+
+Output includes frozen resistance, anchor, confirmation high, transition timestamps,
+rule parameters, source/mode and coverage. Seed history never includes the breakout
+bar. Lookback selection is a caller-configured convention, not automatic discovery
+of an economically meaningful resistance level. Stale or unfinished bars fail;
+zero observed volume or insufficient seed/observation history is unavailable.
+No active stop or order is created. This proposed rule has synthetic transition
+tests and remains unbacktested. First-pullback and higher-low continuation are pending.
+
+## First-pullback research state
+
+`evaluate_first_pullback(bars, as_of=..., config=PullbackConfig())` evaluates one
+completed, contiguous, labeled intraday session slice. The default impulse is the
+initial three bars with strictly rising closes, nonzero volumes, and at least a
+5% gain from first to last close. Unqualified seeds report NO_SETUP; short seeds
+report UNAVAILABLE. A qualifying seed enters IMPULSE.
+
+Until the first lower close, the observed impulse peak may grow. The first
+nonzero-volume lower close starts WATCH and freezes the peak and first pullback
+high. The impulse base is the lowest low in the initial seed. The invalidation
+anchor is peak minus 50% (configurable) of the peak-to-base range. Any low at/below
+that anchor, including on the first pullback bar, invalidates before confirmation.
+
+A distinct later nonzero-volume close strictly above the first pullback high
+confirms, provided it is within the default 3% extension above the frozen peak.
+Confirmation must occur within five later bars by default; later observations
+report EXPIRED if still unconfirmed. INVALIDATED and EXPIRED are terminal for
+this first-event evaluation. EXTENDED blocks new confirmation. Confirmed state
+holds until anchor invalidation or excessive extension.
+
+Output includes impulse base/peak, confirmation/anchor levels, transition times,
+parameters, source/mode and exact coverage. Stale or unfinished bars fail under
+the same two-minute default observation-age policy as other setup rules.
+This v1.0 rule is proposed research logic with synthetic transition tests, not a
+validated profitable strategy. The anchor is not a broker stop or a position-size
+calculation. Higher-low continuation remains pending.
+
+## Higher-low continuation research state
+
+`evaluate_higher_low(bars, as_of=..., config=HigherLowConfig())` processes a completed,
+contiguous, labeled intraday session slice chronologically. A strict pivot low
+must be lower than each of `pivot_width` bars on both sides (default one). Every
+bar in that pivot window must have nonzero volume. Tied lows are not pivots.
+
+A pivot becomes available only after its right-side bars finish. A second
+consecutive confirmed pivot must have a strictly higher low and satisfy the
+configured minimum percentage improvement (default zero). WATCH begins when
+that higher low becomes known. `higher_low_at` identifies the pivot bar start;
+`identified_at` is the end of the right-side recognition bar, avoiding backdated
+knowledge. A separate later nonzero-volume close strictly above the highest high
+between the two pivots confirms within the default 3% extension limit.
+
+The higher-low price is the frozen research invalidation anchor; any subsequent
+low at/below it invalidates before confirmation. The intervening high remains
+fixed after recognition. Excessive extension reports EXTENDED and blocks new
+confirmation. INVALIDATED stays terminal for the first qualifying pair.
+
+Output includes pivot/recognition/transition timestamps, levels, rule version,
+parameters, source/mode and coverage. Other transition timestamps identify the
+associated completed bar starts; they do not imply that its close was available
+at the start. Stale/unfinished input fails. This proposed rule is tested against
+synthetic transitions and remains unbacktested; no stop or order is created.

@@ -44,11 +44,13 @@ Goal: create one trustworthy interface for market data.
 ## Phase 3 — Setup State
 
 - [x] VWAP reclaim
-- [ ] breakout/retest
-- [ ] first pullback
-- [ ] higher-low continuation
-- [ ] excessive-extension flag
-- [ ] explicit confirmation and invalidation
+- [x] Breakout/retest research rule v1 (frozen seed level; distinct-bar transitions)
+- [x] First-pullback research rule v1 (defined impulse/depth/window; synthetic transitions)
+- [x] Higher-low continuation research rule v1 (delayed pivots; separate confirmation)
+- [x] VWAP extension limit and explicit EXTENDED state
+- [x] Configurable extension limits for all four setup rules
+- [x] Explicit confirmation/invalidation for VWAP reclaim
+- [x] Explicit confirmation/invalidation for all four setup rules
 
 **Milestone:** Tori can say *what setup is present and why* without relying on an LLM guess.
 
