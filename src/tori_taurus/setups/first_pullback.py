@@ -70,7 +70,8 @@ def evaluate_first_pullback(
                         anchor = peak - (peak - base) * config.max_retracement_percent / 100
                         state, reason = "WATCH", "await_later_close_above_first_pullback_high"
                     else:
-                        peak = max(peak, bar.high)
+                        if bar.volume > 0:
+                            peak = max(peak, bar.high)
                         continue
                 if bar.low <= anchor:
                     state, reason, invalidated = (

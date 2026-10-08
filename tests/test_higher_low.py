@@ -47,7 +47,7 @@ def test_delayed_recognition_and_separate_confirmation():
     watch = result(data[:5])
     assert watch["state"] == "WATCH" and watch["confirmed_at"] is None
     assert watch["higher_low_at"] == data[3].timestamp.isoformat()
-    assert watch["identified_at"] == (data[4].timestamp+timedelta(minutes=1)).isoformat()
+    assert watch["identified_at"] == (data[4].timestamp + timedelta(minutes=1)).isoformat()
     assert watch["confirmation_level"] == "13" and watch["invalidation_level"] == "10"
     report = result(data)
     assert report["state"] == "CONFIRMED" and report["mode"] == "replay"

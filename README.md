@@ -4,8 +4,12 @@
 
 Tori Taurus is a modular Python project for researching, scoring, backtesting, and reviewing active equity trading setups. The system is designed to combine deterministic market calculations with AI-assisted analysis while keeping market data, risk rules, and trade decisions auditable.
 
-> **Status:** Early development / portfolio project  
+> **Status:** Local research beta 0.2.0b1
 > **Primary focus:** U.S. equities, momentum setups, catalyst-driven trading, risk management, and behavioral trading review.
+
+## Try the local beta
+
+On Windows with Python 3.11 or newer installed, double-click **Launch-Tori.cmd**. Choose Demo and click **Analyze my plan** to explore risk, guardrails and setup states using clearly labeled synthetic data. See [beta instructions and live-data limits](docs/beta.md). Account inputs and stops remain unverified; the app never submits orders.
 
 ## Why this project exists
 

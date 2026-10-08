@@ -92,3 +92,14 @@ def test_stale_unfinished_and_configuration():
     ]:
         with pytest.raises(ValueError):
             PullbackConfig(**options)
+
+
+def test_zero_volume_does_not_raise_impulse_peak():
+    data = sequence()[:3]
+    data.append(
+        replace(data[-1], timestamp=NOW + timedelta(minutes=3), high=Decimal(100), volume=0)
+    )
+    data.append(replace(sequence()[3], timestamp=NOW + timedelta(minutes=4)))
+    report = result(data)
+    assert report["impulse_peak"] == "12"
+    assert report["invalidation_level"] == "10.5"
