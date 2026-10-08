@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tori-taurus"
-version = "0.2.0b1"
+version = "0.3.0b1"
 description = "AI-assisted quantitative trading research and risk-management platform"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,7 +28,7 @@ where = ["src"]
 include = ["tori_taurus*"]
 
 [tool.setuptools.package-data]
-tori_taurus = ["beta.html"]
+tori_taurus = ["beta.html", "scanner.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

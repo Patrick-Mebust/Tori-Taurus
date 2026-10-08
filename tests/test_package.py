@@ -7,7 +7,7 @@ from importlib.metadata import version
 
 class PackageLayoutTests(unittest.TestCase):
     def test_distribution_metadata(self):
-        self.assertEqual(version("tori-taurus"), "0.2.0b1")
+        self.assertEqual(version("tori-taurus"), "0.3.0b1")
 
     def test_documented_modules_are_importable(self):
         modules = (
