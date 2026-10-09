@@ -5,6 +5,7 @@ import os
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from .alpaca import MarketDataError
 from .models import Bar, Quote, price, symbol, utc
@@ -216,6 +217,8 @@ class WebullProvider:
         ticker = symbol(ticker)
         if interval not in {"1d", "1m"}:
             raise ValueError("Unsupported Webull interval")
+        local_start = start.astimezone(ZoneInfo("America/New_York"))
+        session_code = "PRE" if interval == "1m" and (local_start.hour, local_start.minute) < (9, 30) else "RTH"
         payload = self.call(
             self.data.market_data.get_batch_history_bar,
             [ticker],
@@ -223,7 +226,7 @@ class WebullProvider:
             "D" if interval == "1d" else "M1",
             count="1200" if interval == "1d" else "1650",
             real_time_required=False,
-            trading_sessions="RTH",
+            trading_sessions=session_code,
             start_time=int(utc(start).timestamp() * 1000),
             end_time=int(utc(end).timestamp() * 1000),
         )
@@ -239,7 +242,7 @@ class WebullProvider:
                 volume = price(row["volume"])
                 if interval != "1d" and volume != volume.to_integral_value():
                     raise ValueError("Invalid volume")
-                if interval == "1m" and row["trading_session"] != "RTH":
+                if interval == "1m" and row["trading_session"] != session_code:
                     raise ValueError("Unexpected session")
                 bars.append(
                     Bar(

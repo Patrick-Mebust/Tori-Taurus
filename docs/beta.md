@@ -91,3 +91,20 @@ Live discovery combines Alpaca's top 100 most-active stocks and top 50 gainers, 
 The watchlist ranks valid confirmed setups first, then watch setups, then blocked/unavailable results; percent change breaks ties. This is not a probability or profitability score. An entry requires a WATCH or CONFIRMED setup with observed confirmation and invalidation levels. Entry is the greater of ask and confirmation plus a planning increment, rounded upward; stop is below invalidation. The increment is $0.01 above $1, or $0.0001 below $1, and is not exchange tick-size certification. The 2R target is arithmetic, not a forecast.
 
 Live plans require a fresh regular-session quote, a valid positive bid/ask and a spread of at most 2%. Stale, invalid, missing or incomplete observations do not produce prices. Quotes that become stale during a scan lose their plan before the response is returned. One live scan runs at a time; a time budget stops additional candidate requests, with uninspected counts shown. Failed candidates are reported individually. No live news, float, halt validation or intraday historical relative-volume baselines are supplied.
+
+
+### Premarket research
+
+During premarket on a calendar trading day, detailed live scans request completed
+premarket minute bars in a separate window rather than regular-session bars.
+Webull uses PRE for minute history in that window; daily history remains RTH.
+Stock details show observed premarket price, high/low, volume, quote time and spread.
+The observed volume is a sum of returned bars, not guaranteed whole-session volume.
+Conditional range-break entry and low-based invalidation require at least three
+completed bars, a fresh premarket two-sided quote and spread no greater than 2%.
+Levels expire after 60 seconds and are research only, with no position sizing or
+verified broker stop. Sparse bars remain visibly incomplete; regular setups and
+sizing keep their existing eligibility checks. Discovery still uses bounded
+provider active/gainer lists and snapshot thresholds; it is not a comprehensive
+premarket universe or a ranking by premarket bar volume. Premarket discovery
+snapshot fields and live bar entitlement require authenticated verification.

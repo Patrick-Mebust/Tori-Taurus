@@ -315,6 +315,7 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
                 warning = "Incomplete intraday observations; no setup-derived plan."
             if bars and warning is None:
                 report["intraday"]["last_close"] = str(bars[-1].close)
+            report["premarket_research"] = premarket_research(bars, quote, clock)
             plan = derive_plan(
                 report,
                 account=account,
@@ -391,3 +392,38 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
             else "Read-only market scan. Prices require revalidation before use. No broker positions or stops verified."
         ),
     }
+
+
+def premarket_research(bars, quote, now):
+    """Observed premarket slice only, independent of regular-session sizing."""
+    from datetime import timedelta
+    from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+
+    observed = [b for b in bars if b.session == "premarket"
+                and b.timestamp + timedelta(minutes=1) <= now]
+    if not observed:
+        return None
+    high, low = max(b.high for b in observed), min(b.low for b in observed)
+    last = observed[-1].close
+    tick = Decimal(".0001") if last < 1 else Decimal(".01")
+    fresh = quote.session == "premarket" and timedelta(0) <= now - quote.timestamp <= timedelta(
+        seconds=60)
+    two_sided = quote.bid > 0 and quote.ask >= quote.bid
+    spread = (quote.ask - quote.bid) / quote.ask * 100 if two_sided else None
+    eligible = len(observed) >= 3 and fresh and spread is not None and spread <= 2 and high > low
+    entry = (high / tick).to_integral_value(rounding=ROUND_CEILING) * tick + tick
+    stop = (low / tick).to_integral_value(rounding=ROUND_FLOOR) * tick - tick
+    eligible = eligible and stop > 0 and entry < 5
+    return {"session": "premarket", "observed_bars": len(observed),
+            "first_bar_at": observed[0].timestamp.isoformat(),
+            "last_bar_at": observed[-1].timestamp.isoformat(), "last": str(last),
+            "observed_volume": sum(int(b.volume) for b in observed),
+            "observed_high": str(high), "observed_low": str(low),
+            "spread_percent": str(spread) if spread is not None else None,
+            "conditional_entry": str(entry) if eligible else None,
+            "invalidation": str(stop) if eligible else None,
+            "risk_per_share": str(entry - stop) if eligible else None,
+            "quote_at": quote.timestamp.isoformat(),
+            "note": "Observed premarket bars only; gaps and missing intervals may exist. "
+                    "Levels require three bars and a fresh two-sided premarket quote with spread "
+                    "at most 2%. Invalidation is not a verified broker stop. No position sizing."}

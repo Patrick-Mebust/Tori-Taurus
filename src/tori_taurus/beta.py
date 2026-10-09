@@ -160,7 +160,7 @@ def demo_data(ticker: str, now: datetime):
 
 
 def fetch_live_data(ticker: str, feed: str, *, now: datetime, provider=None, sessions=None):
-    """Completed regular-session snapshot with daily bars from previous dates only."""
+    """Completed current-session snapshot; premarket and regular bars never mix."""
     if provider is None and feed not in {"iex", "sip"}:
         raise ValueError("Unsupported feed")
     if provider is None:
@@ -186,15 +186,18 @@ def fetch_live_data(ticker: str, feed: str, *, now: datetime, provider=None, ses
     current = []
     bounds = sessions._bounds(day)
     if bounds is not None:
-        _, opening, closing, _ = bounds
-        end = min(now.replace(second=0, microsecond=0), closing)
-        if end > opening:
-            current = provider.get_bars(ticker, opening, end, "1m")
+        pre, opening, closing, _ = bounds
+        analysis_session = "premarket" if pre <= now < opening else "regular"
+        start = pre if analysis_session == "premarket" else opening
+        finish = opening if analysis_session == "premarket" else closing
+        end = min(now.replace(second=0, microsecond=0), finish)
+        if end > start:
+            current = provider.get_bars(ticker, start, end, "1m")
             current = [
                 b
                 for b in current
-                if b.session == "regular"
-                and b.timestamp >= opening
+                if b.session == analysis_session
+                and b.timestamp >= start
                 and b.timestamp + timedelta(minutes=1) <= end
             ]
     return quote, daily, current
