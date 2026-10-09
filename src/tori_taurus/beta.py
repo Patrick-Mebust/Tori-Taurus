@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo
 from .behavior.guardrails import GuardrailInputs, evaluate_guardrails
 from .market_data import AlpacaProvider, Bar, MarketDataError, NyseSessions, Quote, SessionProvider
 from .market_data.models import symbol
+from .market_data.webull import credentials_available as webull_credentials_available
 from .report import build_report
 from .risk import RiskInputs
 
@@ -157,7 +158,7 @@ def demo_data(ticker: str, now: datetime):
 
 def fetch_live_data(ticker: str, feed: str, *, now: datetime, provider=None, sessions=None):
     """Completed regular-session snapshot with daily bars from previous dates only."""
-    if feed not in {"iex", "sip"}:
+    if provider is None and feed not in {"iex", "sip"}:
         raise ValueError("Unsupported feed")
     if provider is None:
         if not credentials_available():
@@ -309,6 +310,7 @@ class BetaHandler(BaseHTTPRequestHandler):
                 {
                     "version": "0.3.0b1",
                     "credentials_configured": credentials_available(),
+                    "webull_configured": webull_credentials_available(),
                     "live_verified": False,
                     "default_mode": "demo",
                 },
@@ -325,7 +327,14 @@ class BetaHandler(BaseHTTPRequestHandler):
         ):
             self._send(403, {"error": "Same-origin JSON request required"})
             return
-        if self.path not in {"/api/report", "/api/scan"}:
+        if self.path not in {
+            "/api/report",
+            "/api/scan",
+            "/api/webull/connect",
+            "/api/webull/account",
+            "/api/webull/accounts",
+            "/api/webull/select",
+        }:
             self._send(404, {"error": "Not found"})
             return
         try:
@@ -333,7 +342,34 @@ class BetaHandler(BaseHTTPRequestHandler):
             if not 0 < length <= 16384:
                 raise ValueError("Invalid request length")
             payload = json.loads(self.rfile.read(length))
-            if self.path == "/api/scan":
+            if self.path == "/api/webull/connect":
+                for key in ("app_key", "app_secret"):
+                    value = payload.get(key)
+                    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 512:
+                        raise ValueError("Invalid credentials")
+                os.environ["WEBULL_APP_KEY"] = payload["app_key"].strip()
+                os.environ["WEBULL_APP_SECRET"] = payload["app_secret"].strip()
+                # Process memory only. Never echo submitted credentials or provider bodies.
+                self._send(200, {"configured": True, "verified": False})
+            elif self.path == "/api/webull/accounts":
+                from .market_data.webull import WebullProvider
+
+                self._send(200, {"accounts": WebullProvider().list_accounts()})
+            elif self.path == "/api/webull/select":
+                from .market_data.webull import WebullProvider
+
+                account_id = payload.get("account_id")
+                if not isinstance(account_id, str) or account_id not in {
+                    a["id"] for a in WebullProvider().list_accounts()
+                }:
+                    raise ValueError("Invalid account selection")
+                os.environ["WEBULL_ACCOUNT_ID"] = account_id
+                self._send(200, {"selected": True})
+            elif self.path == "/api/webull/account":
+                from .market_data.webull import WebullProvider
+
+                self._send(200, WebullProvider().account_snapshot())
+            elif self.path == "/api/scan":
                 from .scanner.dashboard import scan_payload
 
                 self._send(200, scan_payload(payload))

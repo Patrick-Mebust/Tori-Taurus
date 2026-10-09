@@ -162,7 +162,8 @@ def test_absent_credentials_fail_without_a_network_request(monkeypatch):
         beta.fetch_live_data("AAPL", "iex", now=NOW)
 
 
-def test_live_filters_partial_daily_and_unfinished_intraday():
+@pytest.mark.parametrize("feed", ["iex", "webull"])
+def test_live_filters_partial_daily_and_unfinished_intraday(feed):
     clock, quote, daily, current, _ = beta.demo_data("TEST", NOW)
 
     class Calendar:
@@ -182,7 +183,7 @@ def test_live_filters_partial_daily_and_unfinished_intraday():
             return daily + [current[-1]] if interval == "1d" else current
 
     _, filtered, bars = beta.fetch_live_data(
-        "TEST", "iex", now=clock - timedelta(seconds=10), provider=Provider(), sessions=Calendar()
+        "TEST", feed, now=clock - timedelta(seconds=10), provider=Provider(), sessions=Calendar()
     )
     assert len(filtered) == len(daily)
     assert len(bars) == len(current) - 1

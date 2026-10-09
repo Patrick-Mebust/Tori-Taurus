@@ -192,6 +192,23 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
     mode = payload.get("mode", "demo")
     if mode not in {"demo", "live"}:
         raise ValueError("Invalid scan mode")
+    broker = None
+    if mode == "live" and payload.get("provider") == "webull":
+        from tori_taurus.market_data.webull import WebullProvider
+
+        provider = provider or WebullProvider()
+        broker = provider.account_snapshot()
+        payload = dict(payload)
+        limits = payload.get("account") or {}
+        payload["account"] = {
+            "equity": broker["equity"],
+            "buying_power": broker["buying_power"],
+            "risk_budget_percent": limits.get("risk_budget_percent", "1"),
+            "max_concentration_percent": limits.get("max_concentration_percent", "20"),
+        }
+        payload["holdings"] = broker["holdings"] if not broker["sizing_issues"] else []
+        if broker["sizing_issues"] or Decimal(broker["equity"]) <= 0:
+            payload["account"] = None
     account = payload.get("account") or None
     context = payload.get("guardrails") or {}
     holdings = payload.get("holdings", [])
@@ -246,7 +263,7 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
                 feed=payload.get("feed", "iex"),
                 max_pages=3,
             )
-        candidates, coverage = discover(provider)
+        candidates, coverage = provider.discover() if broker else discover(provider)
         sessions = sessions or NyseSessions()
         labeled = SessionProvider(provider, sessions)
     started = time.monotonic()
@@ -288,11 +305,21 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
                 demo=mode == "demo",
                 now=now,
             )
+            if broker and (not account or not context.get("losses_confirmed", False)):
+                plan["risk"] = None
+                plan["guardrails"] = None
+                plan["state"] = "RISK BLOCKED"
+                plan["sizing_reason"] = (
+                    "Review broker account issues and confirm today’s realized losses before sizing. "
+                    "Day P/L does not establish realized losses."
+                )
             rows.append(
                 candidate
                 | {"quote": report["quote"], "plan": plan, "report": report, "warning": warning}
             )
-        except (MarketDataError, ValueError, TypeError, KeyError, ArithmeticError):
+        except MarketDataError as exc:
+            errors.append({"symbol": ticker, "reason": str(exc)})
+        except (ValueError, TypeError, KeyError, ArithmeticError):
             errors.append(
                 {
                     "symbol": ticker,
@@ -335,9 +362,14 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
         "candidates": rows,
         "errors": errors,
         "account_configured": bool(account),
+        "broker_account": broker,
         "ready_to_trade": False,
         "ranking": "Eligible setup state, then snapshot percent change; no probability or profitability score.",
         "notice": "DEMO: fabricated stocks and observations."
         if mode == "demo"
-        else "Read-only market scan. Prices require revalidation before use. No broker positions or stops verified.",
+        else (
+            "Read-only Webull scan with broker-reported holdings. Stops and pending orders unverified."
+            if broker
+            else "Read-only market scan. Prices require revalidation before use. No broker positions or stops verified."
+        ),
     }

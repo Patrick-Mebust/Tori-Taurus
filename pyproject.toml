@@ -18,6 +18,7 @@ tori-beta = "tori_taurus.beta:main"
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
 calendar = ["pandas-market-calendars>=5.5,<6"]
+webull = ["webull-openapi-python-sdk==3.0.2"]
 
 [project.urls]
 Repository = "https://github.com/Patrick-Mebust/Tori-Taurus"

@@ -10,7 +10,7 @@ if (-not (Test-Path -LiteralPath $pythonPath)) {
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the local Python environment.' }
 }
 Write-Host 'Preparing Tori Taurus beta. The first launch may take a minute.'
-& $pythonPath -m pip install -e '.[calendar]'
+& $pythonPath -m pip install -e '.[calendar,webull]'
 if ($LASTEXITCODE -ne 0) { throw 'Installation failed. Check your Internet connection and Python installation.' }
 & $pythonPath -m tori_taurus.beta
 if ($LASTEXITCODE -ne 0) { throw 'Tori could not start. See the message above; another copy may already be running.' }

@@ -9,7 +9,7 @@ Tori Taurus is a modular Python project for researching, scoring, backtesting, a
 
 ## Try the local beta
 
-On Windows with Python 3.11 or newer installed, double-click **Launch-Tori.cmd**. The home screen discovers and ranks scanner candidates, derives conditional entry/stop prices, and calculates account-aware risk and projected average cost. Demo mode uses four fabricated stocks; live mode discovers from Alpaca most-active/gainer lists. Enter account limits once per browser session for sizing. See [beta instructions and live-data limits](docs/beta.md). Account inputs and stops remain unverified; the app never submits orders.
+On Windows with Python 3.11 or newer installed, double-click **Launch-Tori.cmd**. The home screen discovers and ranks scanner candidates, derives conditional entry/stop prices, and calculates account-aware risk and projected average cost. Demo mode uses four fabricated stocks; Webull mode discovers from Webull most-active/gainer lists and refreshes your selected broker account; Alpaca remains optional. Enter risk limits once per browser session for sizing. See [Webull connection](docs/webull.md). See [beta instructions and live-data limits](docs/beta.md). Account inputs and stops remain unverified; the app never submits orders.
 
 ## Why this project exists
 

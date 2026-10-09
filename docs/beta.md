@@ -4,13 +4,17 @@
 
 Requires Python 3.11 or newer. On Windows, extract the entire beta ZIP into a folder and double-click **Launch-Tori.cmd**. First launch installs dependencies using your Internet connection. A local browser opens at http://127.0.0.1:8765. Keep the launcher window open; Ctrl+C stops the server.
 
-On other systems, create a virtual environment, install `pip install -e '.[calendar]'`, then run `tori-beta`. Use `tori-beta --port 8766` if the default port is occupied.
+On other systems, create a virtual environment, install `pip install -e '.[calendar,webull]'`, then run `tori-beta`. Use `tori-beta --port 8766` if the default port is occupied.
 
 The home screen opens a demo scanner with four clearly fabricated stocks. Click **Scan for stocks**, then select a candidate to inspect entry, stop, illustrative 2R target and setup rationale. No ticker or entry price is required. The original manual planner remains at `/planner`.
 
 Expand **My account & holdings** once per browser session to enter equity, buying power, limits and optional existing positions. Tori then calculates each candidate's share ceiling, dollar risk, account risk, concentration, remaining buying power, and projected average after an add. Without supplied holdings it labels the calculation a new-position scenario; it does not know your real cost basis. Each candidate uses the same available cash independently and must not be combined as a portfolio allocation. Settings changes invalidate results. Optional auto-refresh starts the next scan 60 seconds after the previous scan completes.
 
 The screen puts planned dollar loss, account risk, allowable shares, concentration, buying power and stop status before setup states. Changes to inputs invalidate the displayed report. The scanner evaluates daily-loss headroom, entry extension and unsupported averaging down. Exit-time cooldown context is available in the secondary manual planner. Context is manually entered and unverified. Daily losses mean gross realized losses; wins do not reset the budget. The chase reference is the last supplied intraday close.
+
+## Connect Webull locally
+
+Use **Connect my Webull account** to enter your API key and secret into the local app, then choose an account. Review [Webull setup, data entitlement and privacy](webull.md). Webull mode reads equity, buying power, holdings and average costs automatically. Confirm realized losses separately before sizing. Keys clear when the server stops.
 
 ## Connect Alpaca locally
 
@@ -27,7 +31,7 @@ Daily aggregates exclude today's unfinished daily bar. Intraday bars include com
 - All reports remain research only, regardless of a confirmed setup or supplied-limit result. Stop levels are planning inputs, not verified broker orders. Gaps, fees, slippage, halts and failed fills can exceed planned losses.
 - Server binds only to `127.0.0.1`, rejects foreign Host/cross-origin report requests, and suppresses request logging. Inputs stay in process memory. Do not expose this server publicly.
 - No automatic report or account persistence. **Download JSON** deliberately saves a report containing account-derived figures; keep that file private.
-- No exchange-wide discovery, news/catalyst verification, trading journal, automated broker sync or autonomous trading in this beta.
+- No exchange-wide discovery, news/catalyst verification, trading journal, broker order/stop verification or autonomous trading in this beta.
 
 ## Validation boundaries
 
