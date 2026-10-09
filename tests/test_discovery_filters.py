@@ -159,3 +159,24 @@ def test_unusable_discovery_is_error_not_zero_matches(listings, snapshots):
     with pytest.raises(MarketDataError) as exc:
         discovery_provider(listings, snapshots).discover()
     assert "private-sentinel" not in str(exc.value)
+
+
+def test_large_provider_lists_are_capped_before_snapshot_requests():
+    def response(rows):
+        return SimpleNamespace(status_code=200, json=lambda: rows)
+    provider = WebullProvider(data=SimpleNamespace(screener=SimpleNamespace(
+        list_most_active=lambda *a, **k: response([{"symbol": f"A{i}"} for i in range(500)]),
+        list_gainers_losers=lambda *a, **k: response([{"symbol": f"G{i}"} for i in range(500)])
+    )), account=SimpleNamespace())
+    queried = []
+    def snapshots(symbols):
+        queried.extend(symbols)
+        return [{"symbol": s, "price": "2", "pre_close": "1", "volume": "200000"}
+                for s in symbols]
+    provider.snapshots = snapshots
+    rows, coverage = provider.discover()
+    assert len(queried) == 400
+    assert "A200" not in queried and "G200" not in queried
+    assert coverage["listing_rows_returned"] == 1000
+    assert coverage["listing_rows_considered"] == coverage["discovered"] == 400
+    assert len(rows) == 20

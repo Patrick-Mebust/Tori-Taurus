@@ -284,6 +284,8 @@ class WebullProvider:
         try:
             if not isinstance(active, list) or not isinstance(gainers, list):
                 raise MarketDataError("Webull discovery lists have an unsupported format. Retry later.")
+            listing_rows_returned = len(active) + len(gainers)
+            active, gainers = active[:200], gainers[:200]
             tickers_set, invalid_listing_rows = set(), 0
             for listing in active + gainers:
                 try:
@@ -333,6 +335,8 @@ class WebullProvider:
                 "universe": "Webull top 200 most active and top 200 gainers; not the full market",
                 "discovered": len(tickers),
                 "matched": len(candidates),
+                "listing_rows_returned": listing_rows_returned,
+                "listing_rows_considered": len(active) + len(gainers),
                 "invalid_listing_rows": invalid_listing_rows,
                 "invalid_snapshot_rows": invalid_snapshot_rows,
                 "missing_snapshots": missing_snapshots,
