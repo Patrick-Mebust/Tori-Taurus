@@ -83,6 +83,19 @@ def summarize(posts: list[dict], symbols: list[str], now: datetime, coverage: li
     }
 
 
+class PublicDataError(ValueError):
+    """Only predefined public failure descriptions; never provider response bodies."""
+    def __init__(self, code=None):
+        self.reason = {
+            400: "HTTP 400: X rejected the search parameters or query. Check supported operators.",
+            401: "HTTP 401: Token rejected or expired. Reconnect with the app bearer token.",
+            402: "HTTP 402: API credits or payment required. Check the developer credit balance.",
+            403: "HTTP 403: API access denied. Check app permissions and developer access.",
+            429: "HTTP 429: Rate limit or usage cap reached. Wait and check usage limits.",
+        }.get(code, "Public data unavailable; network, service or response failure.")
+        super().__init__(self.reason)
+
+
 def _get(url: str, token: str):
     request = Request(url, headers={
         "Authorization": "Bearer " + token, "User-Agent": "ToriTaurus/0.3 public research"
@@ -94,9 +107,9 @@ def _get(url: str, token: str):
             raise ValueError("Response exceeded the scan limit")
         return json.loads(raw)
     except HTTPError as exc:
-        raise ValueError(f"HTTP {exc.code}; check access, quota and entitlement") from None
+        raise PublicDataError(exc.code) from None
     except (URLError, TimeoutError, OSError, UnicodeError, json.JSONDecodeError):
-        raise ValueError("Public data request unavailable; private response omitted") from None
+        raise PublicDataError() from None
 
 
 def collect(symbols: list[str], now: datetime, allow_paid_x: bool = False):
@@ -145,6 +158,8 @@ def collect(symbols: list[str], now: datetime, allow_paid_x: bool = False):
                 coverage.append({"source": "x", "status": "partial response" if data.get(
                     "errors") else "sampled recent posts", "posts": len(data.get("data", [])),
                     "limit": 100})
+            except PublicDataError as exc:
+                coverage.append({"source": "x", "status": exc.reason, "posts": None})
             except (ValueError, KeyError, TypeError):
                 coverage.append({"source": "x", "status": "unavailable; check API access",
                                  "posts": None})

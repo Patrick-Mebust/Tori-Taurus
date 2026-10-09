@@ -95,3 +95,17 @@ def test_bounded_public_collection_and_paid_opt_in(monkeypatch):
     assert result["tickers"][0]["sentiment"] == "mixed"
     assert "synthetic" not in str(result)
     assert "public-author" not in str(result)
+
+
+@pytest.mark.parametrize("code", [400, 401, 402, 403, 429])
+def test_x_failure_has_safe_actionable_status(monkeypatch, code):
+    from tori_taurus.social import PublicDataError
+    monkeypatch.delenv("TORI_REDDIT_ACCESS_TOKEN", raising=False)
+    monkeypatch.setenv("TORI_X_BEARER_TOKEN", "synthetic-private-token")
+    def denied(*args):
+        raise PublicDataError(code)
+    monkeypatch.setattr("tori_taurus.social._get", denied)
+    result = collect(["XYZ"], NOW, True)
+    assert f"HTTP {code}" in result["coverage"][2]["status"]
+    assert "synthetic-private-token" not in str(result)
+    assert result["coverage"][2]["posts"] is None
