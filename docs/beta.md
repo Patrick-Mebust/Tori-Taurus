@@ -37,6 +37,16 @@ relative volume remains unavailable without matching historical session slices. 
 stay unavailable. Live entry, stop and sizing displays expire when the quote passes 60 seconds;
 refreshing the webpage alone does not refresh market observations.
 
+## Compare completed scans
+
+After two completed scans in the same mode/feed and Eastern calendar day, stocks present in both
+can show snapshot price change, added snapshot volume and change in session gain (percentage points).
+Sort by price change or added volume to review the differences. The detail panel shows both scan
+completion times. These are comparisons of fetched snapshots; snapshot freshness is not independently
+verified and they are not tick-stream momentum signals or entry approvals. Missing stocks, invalid
+snapshots, mode/feed/day changes, non-increasing scan timestamps and decreases in session volume
+reset comparisons. Comparison history stays in memory and clears on page refresh.
+
 ## Watch stocks between scans
 
 Select a candidate and click **Watch this stock**. The watch panel retains up to 50 tickers in
