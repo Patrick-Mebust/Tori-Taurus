@@ -14,6 +14,7 @@ dependencies = ["tzdata>=2025.2; platform_system == 'Windows'"]
 tori-market-check = "tori_taurus.market_data.smoke:main"
 tori-report = "tori_taurus.report:main"
 tori-beta = "tori_taurus.beta:main"
+tori-social = "tori_taurus.social:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
