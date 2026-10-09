@@ -334,7 +334,10 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
                 )
             rows.append(
                 candidate
-                | {"quote": report["quote"], "plan": plan, "report": report, "warning": warning}
+                | {"quote": report["quote"], "plan": plan, "report": report, "warning": warning,
+                   "chart": {"source": quote.source, "mode": mode,
+                             "session": [chart_bar(b) for b in bars],
+                             "daily": [chart_bar(b) for b in daily]}}
             )
         except MarketDataError as exc:
             errors.append({"symbol": ticker, "reason": str(exc)})
@@ -427,3 +430,10 @@ def premarket_research(bars, quote, now):
             "note": "Observed premarket bars only; gaps and missing intervals may exist. "
                     "Levels require three bars and a fresh two-sided premarket quote with spread "
                     "at most 2%. Invalidation is not a verified broker stop. No position sizing."}
+
+
+def chart_bar(bar):
+    """JSON-safe actual OHLCV observations; never fill missing intervals."""
+    return {"time": bar.timestamp.isoformat(), "open": str(bar.open),
+            "high": str(bar.high), "low": str(bar.low), "close": str(bar.close),
+            "volume": str(bar.volume), "session": bar.session, "interval": bar.interval}

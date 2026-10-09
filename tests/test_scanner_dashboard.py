@@ -210,3 +210,16 @@ def test_discovery_rejects_malformed_top_level(monkeypatch):
     monkeypatch.setattr(provider, "_get_json", lambda url: {})
     with pytest.raises(MarketDataError):
         discover(provider)
+
+
+def test_chart_payload_contains_observed_bars_and_serializes():
+    import json
+    data = scan_payload({"mode": "demo"})
+    for row in data["candidates"]:
+        chart = row["chart"]
+        assert chart["mode"] == "demo" and chart["source"] == "synthetic:scanner"
+        assert chart["session"] and chart["daily"]
+        for bar in chart["session"] + chart["daily"]:
+            assert set(bar) == {"time", "open", "high", "low", "close", "volume", "session", "interval"}
+        assert chart["session"][-1]["close"] == row["report"]["intraday"]["last_close"]
+    json.dumps(data)

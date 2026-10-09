@@ -120,3 +120,17 @@ choices if the server still has keys. Replace credentials explicitly reveals the
 password fields while keeping the current connection until replacements are sent.
 Server restarts still clear process credentials. Changing accounts invalidates
 previous market plans so sizing cannot show a prior account's values.
+
+
+### Watched stock cards and charts
+
+Watched cards show the latest inspected stock's quote, change, volume, spread,
+conditional levels, holding average/shares, projected average, proposed add shares,
+dollar loss, account risk and concentration. Missing sizing or stale prices are
+explicitly unavailable. Click the card to open an in-app candlestick/volume chart
+with observed session or completed daily bars. Charts use serialized provider bars;
+no bars are fabricated or missing intervals filled. Demo charts remain synthetic.
+The time axis preserves gaps. Session charts show fresh conditional entry and
+invalidation lines; these are research levels, not broker orders. Chart snapshots
+update only after scans. If a watched ticker is absent from the latest inspected
+results, its card and chart show unavailability rather than retaining old values.
