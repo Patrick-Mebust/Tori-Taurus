@@ -6,8 +6,11 @@ from decimal import Decimal
 from tori_taurus.market_data import MarketDataError
 from tori_taurus.market_data.models import price, symbol, utc
 
+from .filters import DiscoveryFilters
 
-def discover(provider):
+
+def discover(provider, filters=None):
+    filters = filters or DiscoveryFilters()
     root = "https://data.alpaca.markets/v1beta1/screener/stocks/"
     active = provider._get_json(root + "most-actives?by=volume&top=100")
     movers = provider._get_json(root + "movers?top=50")
@@ -43,11 +46,11 @@ def discover(provider):
             if volume != volume.to_integral_value() or previous_close <= 0:
                 raise ValueError("Invalid snapshot")
             change = (last / previous_close - 1) * 100
-            if not Decimal(".01") <= last < 5 or change <= 0 or volume < 100000:
+            if not filters.matches(last, change, volume):
                 rejected.append(
                     {
                         "symbol": ticker,
-                        "reason": "Outside price, positive-change or 100,000-share volume filters",
+                        "reason": "Outside selected price, positive-change or volume filters",
                     }
                 )
                 continue
@@ -65,16 +68,18 @@ def discover(provider):
     candidates.sort(
         key=lambda row: (-Decimal(row["change_percent"]), -row["volume"], row["symbol"])
     )
-    return candidates[:20], {
+    depth = filters.max_candidates
+    return candidates[:depth], {
         "universe": "Alpaca top 100 most-active stocks and top 50 gainers; not all listed stocks",
         "discovered": len(tickers),
         "matched": len(candidates),
-        "inspected": min(20, len(candidates)),
-        "not_inspected": max(0, len(candidates) - 20),
+        "inspected": min(depth, len(candidates)),
+        "not_inspected": max(0, len(candidates) - depth),
+        "filters": filters.as_dict(),
         "filtered": rejected,
         "most_active_updated_at": active_at.isoformat(),
         "movers_updated_at": movers_at.isoformat(),
         "discovery_source": "Alpaca SIP screeners",
         "analysis_feed": provider.feed,
-        "limits": "Top 20 matches by snapshot change are inspected. Movers show the previous session until market open. Volume is a partial-day total, not relative volume. Equities can include ETFs; common-stock classification is not verified.",
+        "limits": f"Up to {depth} matches by snapshot change are inspected within a 90-second detail budget. Movers show the previous session until market open. Volume is a partial-day total, not relative volume. Equities can include ETFs; common-stock classification is not verified.",
     }

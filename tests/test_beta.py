@@ -162,7 +162,8 @@ def test_absent_credentials_fail_without_a_network_request(monkeypatch):
         beta.fetch_live_data("AAPL", "iex", now=NOW)
 
 
-def test_live_filters_partial_daily_and_unfinished_intraday():
+@pytest.mark.parametrize("feed", ["iex", "webull"])
+def test_live_filters_partial_daily_and_unfinished_intraday(feed):
     clock, quote, daily, current, _ = beta.demo_data("TEST", NOW)
 
     class Calendar:
@@ -182,7 +183,7 @@ def test_live_filters_partial_daily_and_unfinished_intraday():
             return daily + [current[-1]] if interval == "1d" else current
 
     _, filtered, bars = beta.fetch_live_data(
-        "TEST", "iex", now=clock - timedelta(seconds=10), provider=Provider(), sessions=Calendar()
+        "TEST", feed, now=clock - timedelta(seconds=10), provider=Provider(), sessions=Calendar()
     )
     assert len(filtered) == len(daily)
     assert len(bars) == len(current) - 1
@@ -315,5 +316,47 @@ def test_scanner_endpoint_returns_candidates_without_ticker(local_server):
 def test_root_is_scanner_and_manual_planner_is_secondary(local_server):
     _, _, root = request(local_server, "GET", "/")
     _, _, planner = request(local_server, "GET", "/planner")
-    assert b"Candidate watchlist" in root
+    assert b"Momentum board" in root
+    assert b'id="topPicks"' in root
     assert b"Your trade plan" in planner
+
+
+def test_social_token_stays_private_and_scan_requires_ack(local_server, monkeypatch):
+    monkeypatch.delenv("TORI_X_BEARER_TOKEN", raising=False)
+    headers = {"Origin": f"http://127.0.0.1:{local_server}", "Content-Type": "application/json"}
+    token = "synthetic-private-token-only"
+    status, _, body = request(local_server, "POST", "/api/social/connect",
+                              json.dumps({"token": token}), **headers)
+    assert status == 200 and token.encode() not in body
+    _, _, body = request(local_server, "GET", "/api/status")
+    assert json.loads(body)["x_configured"] is True and token.encode() not in body
+    calls = []
+    monkeypatch.setattr("tori_taurus.social.collect", lambda *a, **k: calls.append(a) or {
+        "schema": "tori.social.v1", "tickers": [], "coverage": []})
+    for ack in (False, "true", 1):
+        assert request(local_server, "POST", "/api/social/scan",
+                       json.dumps({"symbols": ["XYZ"], "allow_paid_x": ack}), **headers)[0] == 400
+    assert not calls
+    assert request(local_server, "POST", "/api/social/scan",
+                   json.dumps({"symbols": ["XYZ"], "allow_paid_x": True}), **headers)[0] == 200
+    assert len(calls) == 1
+    assert request(local_server, "POST", "/api/social/disconnect", "{}", **headers)[0] == 200
+    assert request(local_server, "POST", "/api/social/scan",
+                   json.dumps({"symbols": ["XYZ"], "allow_paid_x": True}), **headers)[0] == 400
+
+
+def test_social_rejects_foreign_origin_invalid_tokens_and_busy_scan(local_server, monkeypatch):
+    headers = {"Origin": f"http://127.0.0.1:{local_server}", "Content-Type": "application/json"}
+    assert request(local_server, "POST", "/api/social/connect", "{}",
+                   **{**headers, "Origin": "https://evil.example"})[0] == 403
+    for token in ("private-sentinel", "x" * 2100, "invalid token contains spaces"):
+        status, _, body = request(local_server, "POST", "/api/social/connect",
+                                  json.dumps({"token": token}), **headers)
+        assert status == 400 and token.encode() not in body
+    monkeypatch.setenv("TORI_X_BEARER_TOKEN", "synthetic-test-token")
+    beta.SOCIAL_SCAN_LOCK.acquire()
+    try:
+        assert request(local_server, "POST", "/api/social/scan",
+                       json.dumps({"symbols": ["XYZ"], "allow_paid_x": True}), **headers)[0] == 409
+    finally:
+        beta.SOCIAL_SCAN_LOCK.release()

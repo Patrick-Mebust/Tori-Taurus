@@ -4,13 +4,64 @@
 
 Requires Python 3.11 or newer. On Windows, extract the entire beta ZIP into a folder and double-click **Launch-Tori.cmd**. First launch installs dependencies using your Internet connection. A local browser opens at http://127.0.0.1:8765. Keep the launcher window open; Ctrl+C stops the server.
 
-On other systems, create a virtual environment, install `pip install -e '.[calendar]'`, then run `tori-beta`. Use `tori-beta --port 8766` if the default port is occupied.
+On other systems, create a virtual environment, install `pip install -e '.[calendar,webull]'`, then run `tori-beta`. Use `tori-beta --port 8766` if the default port is occupied.
 
 The home screen opens a demo scanner with four clearly fabricated stocks. Click **Scan for stocks**, then select a candidate to inspect entry, stop, illustrative 2R target and setup rationale. No ticker or entry price is required. The original manual planner remains at `/planner`.
 
 Expand **My account & holdings** once per browser session to enter equity, buying power, limits and optional existing positions. Tori then calculates each candidate's share ceiling, dollar risk, account risk, concentration, remaining buying power, and projected average after an add. Without supplied holdings it labels the calculation a new-position scenario; it does not know your real cost basis. Each candidate uses the same available cash independently and must not be combined as a portfolio allocation. Settings changes invalidate results. Optional auto-refresh starts the next scan 60 seconds after the previous scan completes.
 
 The screen puts planned dollar loss, account risk, allowable shares, concentration, buying power and stop status before setup states. Changes to inputs invalidate the displayed report. The scanner evaluates daily-loss headroom, entry extension and unsupported averaging down. Exit-time cooldown context is available in the secondary manual planner. Context is manually entered and unverified. Daily losses mean gross realized losses; wins do not reset the budget. The chase reference is the last supplied intraday close.
+
+## Connect Webull locally
+
+Use **Connect my Webull account** to enter your API key and secret into the local app, then choose an account. Review [Webull setup, data entitlement and privacy](webull.md). Webull mode reads equity, buying power, holdings and average costs automatically. Confirm realized losses separately before sizing. Keys clear when the server stops.
+
+## Broader scans and stock details
+
+**Scanner filters & depth** controls the minimum price, exclusive price ceiling (at most $5),
+minimum positive snapshot gain and minimum snapshot session volume. Select 20, 40 or 60 detailed
+candidates. Filters run before the inspection cap on both Webull and Alpaca. The same provider
+active/gainer lists supply the universe; this does not turn the scan into exchange-wide discovery.
+A 90-second detail budget may leave additional matches uninspected. The coverage summary reports
+the applied filters and remaining matches. Demo mode applies the same filters to four synthetic stocks.
+
+Search inspected results by ticker, sort by setup, gain, volume, quoted spread or snapshot price,
+or show only stocks with levels, fresh regular-session quotes, or supplied/broker-reported holdings.
+These view controls do not make additional data requests or broaden the already completed scan.
+
+The stock detail panel shows bid/ask/spread, snapshot volume, observed intraday range and volume,
+VWAP, volume acceleration where available, completed daily EMA 5/9/20, RSI 14, ATR 14, daily opening
+gap and completed-day relative volume. All four setup checks show their state and explanation.
+Daily features describe the last completed daily bar, not current-session momentum. Intraday
+relative volume remains unavailable without matching historical session slices. Missing observations
+stay unavailable. Live entry, stop and sizing displays expire when the quote passes 60 seconds;
+refreshing the webpage alone does not refresh market observations.
+
+## Compare completed scans
+
+After two completed scans in the same mode/feed and Eastern calendar day, stocks present in both
+can show snapshot price change, added snapshot volume and change in session gain (percentage points).
+Sort by price change or added volume to review the differences. The detail panel shows both scan
+completion times. These are comparisons of fetched snapshots; snapshot freshness is not independently
+verified and they are not tick-stream momentum signals or entry approvals. Missing stocks, invalid
+snapshots, mode/feed/day changes, non-increasing scan timestamps and decreases in session volume
+reset comparisons. Comparison history stays in memory and clears on page refresh.
+
+## Watch stocks between scans
+
+Select a candidate and click **Watch this stock**. The watch panel retains up to 50 tickers in
+the open tab, with optional setup-change notices after completed scans. The first eligible scan
+establishes a baseline; later changes to any of the four setup states produce an in-page notice.
+Notices do not place orders, use desktop notifications, or run scans by themselves. Use the existing
+scan button or optional refresh control to fetch new observations.
+
+Watched stocks are evaluated only if they appear in the latest inspected results. Missing or stale
+observations clear the comparison baseline, rather than suggesting that no change occurred. Changing
+data mode/feed resets comparisons and notices so demo and live observations are not mixed. At most
+20 notices are retained. Only the watched ticker list is saved in browser session storage and survives page refreshes
+in that tab. Closing the tab ends the watchlist session. Baselines and notices reset on refresh;
+credentials and broker values are never saved by this feature. When view filters hide every
+inspected stock, **Show all inspected stocks** clears those view filters without another data request.
 
 ## Connect Alpaca locally
 
@@ -27,7 +78,7 @@ Daily aggregates exclude today's unfinished daily bar. Intraday bars include com
 - All reports remain research only, regardless of a confirmed setup or supplied-limit result. Stop levels are planning inputs, not verified broker orders. Gaps, fees, slippage, halts and failed fills can exceed planned losses.
 - Server binds only to `127.0.0.1`, rejects foreign Host/cross-origin report requests, and suppresses request logging. Inputs stay in process memory. Do not expose this server publicly.
 - No automatic report or account persistence. **Download JSON** deliberately saves a report containing account-derived figures; keep that file private.
-- No exchange-wide discovery, news/catalyst verification, trading journal, automated broker sync or autonomous trading in this beta.
+- No exchange-wide discovery, news/catalyst verification, trading journal, broker order/stop verification or autonomous trading in this beta.
 
 ## Validation boundaries
 
@@ -40,3 +91,46 @@ Live discovery combines Alpaca's top 100 most-active stocks and top 50 gainers, 
 The watchlist ranks valid confirmed setups first, then watch setups, then blocked/unavailable results; percent change breaks ties. This is not a probability or profitability score. An entry requires a WATCH or CONFIRMED setup with observed confirmation and invalidation levels. Entry is the greater of ask and confirmation plus a planning increment, rounded upward; stop is below invalidation. The increment is $0.01 above $1, or $0.0001 below $1, and is not exchange tick-size certification. The 2R target is arithmetic, not a forecast.
 
 Live plans require a fresh regular-session quote, a valid positive bid/ask and a spread of at most 2%. Stale, invalid, missing or incomplete observations do not produce prices. Quotes that become stale during a scan lose their plan before the response is returned. One live scan runs at a time; a time budget stops additional candidate requests, with uninspected counts shown. Failed candidates are reported individually. No live news, float, halt validation or intraday historical relative-volume baselines are supplied.
+
+
+### Premarket research
+
+During premarket on a calendar trading day, detailed live scans request completed
+premarket minute bars in a separate window rather than regular-session bars.
+Webull uses PRE for minute history in that window; daily history remains RTH.
+Stock details show observed premarket price, high/low, volume, quote time and spread.
+The observed volume is a sum of returned bars, not guaranteed whole-session volume.
+Conditional range-break entry and low-based invalidation require at least three
+completed bars, a fresh premarket two-sided quote and spread no greater than 2%.
+Levels expire after 60 seconds and are research only, with no position sizing or
+verified broker stop. Sparse bars remain visibly incomplete; regular setups and
+sizing keep their existing eligibility checks. Discovery still uses bounded
+provider active/gainer lists and snapshot thresholds; it is not a comprehensive
+premarket universe or a ranking by premarket bar volume. Premarket discovery
+snapshot fields and live bar entitlement require authenticated verification.
+
+
+### Webull account selection
+
+Enter API keys once per server session, then choose an account and click Use this
+account. The password fields clear for privacy and hide once the server accepts
+credentials. Account selection reuses the session credentials; it does not submit
+blank replacements or navigate/reload the page. Page refresh restores account
+choices if the server still has keys. Replace credentials explicitly reveals the
+password fields while keeping the current connection until replacements are sent.
+Server restarts still clear process credentials. Changing accounts invalidates
+previous market plans so sizing cannot show a prior account's values.
+
+
+### Watched stock cards and charts
+
+Watched cards show the latest inspected stock's quote, change, volume, spread,
+conditional levels, holding average/shares, projected average, proposed add shares,
+dollar loss, account risk and concentration. Missing sizing or stale prices are
+explicitly unavailable. Click the card to open an in-app candlestick/volume chart
+with observed session or completed daily bars. Charts use serialized provider bars;
+no bars are fabricated or missing intervals filled. Demo charts remain synthetic.
+The time axis preserves gaps. Session charts show fresh conditional entry and
+invalidation lines; these are research levels, not broker orders. Chart snapshots
+update only after scans. If a watched ticker is absent from the latest inspected
+results, its card and chart show unavailability rather than retaining old values.

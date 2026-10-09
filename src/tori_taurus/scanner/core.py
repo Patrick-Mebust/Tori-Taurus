@@ -102,7 +102,8 @@ def evaluate_daily(bars: list[Bar], *, as_of: datetime, config: ScanConfig | Non
         "basis": "supplied_daily_bars",
         "features": {
             "close": str(latest.close),
-            "volume": latest.volume,
+            "volume": str(latest.volume) if latest.volume_adjusted else latest.volume,
+            "volume_basis": "adjusted" if latest.volume_adjusted else "unadjusted",
             "change_percent": number(change),
             "gap_percent": number(gap),
             "daily_relative_volume": number(relative),

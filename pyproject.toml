@@ -14,10 +14,12 @@ dependencies = ["tzdata>=2025.2; platform_system == 'Windows'"]
 tori-market-check = "tori_taurus.market_data.smoke:main"
 tori-report = "tori_taurus.report:main"
 tori-beta = "tori_taurus.beta:main"
+tori-social = "tori_taurus.social:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
 calendar = ["pandas-market-calendars>=5.5,<6"]
+webull = ["webull-openapi-python-sdk==3.0.2"]
 
 [project.urls]
 Repository = "https://github.com/Patrick-Mebust/Tori-Taurus"

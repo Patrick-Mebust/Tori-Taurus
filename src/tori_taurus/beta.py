@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import threading
 import webbrowser
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -13,8 +14,11 @@ from zoneinfo import ZoneInfo
 from .behavior.guardrails import GuardrailInputs, evaluate_guardrails
 from .market_data import AlpacaProvider, Bar, MarketDataError, NyseSessions, Quote, SessionProvider
 from .market_data.models import symbol
+from .market_data.webull import credentials_available as webull_credentials_available
 from .report import build_report
 from .risk import RiskInputs
+
+SOCIAL_SCAN_LOCK = threading.Lock()
 
 
 def credentials_available() -> bool:
@@ -156,8 +160,8 @@ def demo_data(ticker: str, now: datetime):
 
 
 def fetch_live_data(ticker: str, feed: str, *, now: datetime, provider=None, sessions=None):
-    """Completed regular-session snapshot with daily bars from previous dates only."""
-    if feed not in {"iex", "sip"}:
+    """Completed current-session snapshot; premarket and regular bars never mix."""
+    if provider is None and feed not in {"iex", "sip"}:
         raise ValueError("Unsupported feed")
     if provider is None:
         if not credentials_available():
@@ -182,15 +186,18 @@ def fetch_live_data(ticker: str, feed: str, *, now: datetime, provider=None, ses
     current = []
     bounds = sessions._bounds(day)
     if bounds is not None:
-        _, opening, closing, _ = bounds
-        end = min(now.replace(second=0, microsecond=0), closing)
-        if end > opening:
-            current = provider.get_bars(ticker, opening, end, "1m")
+        pre, opening, closing, _ = bounds
+        analysis_session = "premarket" if pre <= now < opening else "regular"
+        start = pre if analysis_session == "premarket" else opening
+        finish = opening if analysis_session == "premarket" else closing
+        end = min(now.replace(second=0, microsecond=0), finish)
+        if end > start:
+            current = provider.get_bars(ticker, start, end, "1m")
             current = [
                 b
                 for b in current
-                if b.session == "regular"
-                and b.timestamp >= opening
+                if b.session == analysis_session
+                and b.timestamp >= start
                 and b.timestamp + timedelta(minutes=1) <= end
             ]
     return quote, daily, current
@@ -309,6 +316,8 @@ class BetaHandler(BaseHTTPRequestHandler):
                 {
                     "version": "0.3.0b1",
                     "credentials_configured": credentials_available(),
+                    "webull_configured": webull_credentials_available(),
+                    "x_configured": bool(os.environ.get("TORI_X_BEARER_TOKEN", "").strip()),
                     "live_verified": False,
                     "default_mode": "demo",
                 },
@@ -325,7 +334,17 @@ class BetaHandler(BaseHTTPRequestHandler):
         ):
             self._send(403, {"error": "Same-origin JSON request required"})
             return
-        if self.path not in {"/api/report", "/api/scan"}:
+        if self.path not in {
+            "/api/report",
+            "/api/social/connect",
+            "/api/social/disconnect",
+            "/api/social/scan",
+            "/api/scan",
+            "/api/webull/connect",
+            "/api/webull/account",
+            "/api/webull/accounts",
+            "/api/webull/select",
+        }:
             self._send(404, {"error": "Not found"})
             return
         try:
@@ -333,7 +352,64 @@ class BetaHandler(BaseHTTPRequestHandler):
             if not 0 < length <= 16384:
                 raise ValueError("Invalid request length")
             payload = json.loads(self.rfile.read(length))
-            if self.path == "/api/scan":
+            if self.path == "/api/social/connect":
+                token = payload.get("token")
+                if not isinstance(token, str) or not 20 <= len(token) <= 2048 or any(
+                    c.isspace() or ord(c) < 33 or ord(c) > 126 for c in token
+                ):
+                    raise ValueError("Invalid token")
+                os.environ["TORI_X_BEARER_TOKEN"] = token
+                self._send(200, {"configured": True, "verified": False})
+            elif self.path == "/api/social/disconnect":
+                os.environ.pop("TORI_X_BEARER_TOKEN", None)
+                self._send(200, {"configured": False})
+            elif self.path == "/api/social/scan":
+                from .social import collect, summarize
+
+                symbols = payload.get("symbols")
+                now = datetime.now(UTC)
+                if not isinstance(symbols, list) or any(not isinstance(s, str) for s in symbols):
+                    raise ValueError("Invalid ticker list")
+                summarize([], symbols, now, [])
+                if payload.get("allow_paid_x") is not True or not os.environ.get(
+                    "TORI_X_BEARER_TOKEN", ""
+                ).strip():
+                    self._send(400, {"error": "Connect X and acknowledge the paid scan first."})
+                elif not SOCIAL_SCAN_LOCK.acquire(blocking=False):
+                    self._send(409, {"error": "A social scan is already running. Wait for its result."})
+                else:
+                    try:
+                        self._send(200, collect(symbols, now, allow_paid_x=True))
+                    finally:
+                        SOCIAL_SCAN_LOCK.release()
+            elif self.path == "/api/webull/connect":
+                for key in ("app_key", "app_secret"):
+                    value = payload.get(key)
+                    if not isinstance(value, str) or not 1 <= len(value.strip()) <= 512:
+                        raise ValueError("Invalid credentials")
+                os.environ["WEBULL_APP_KEY"] = payload["app_key"].strip()
+                os.environ["WEBULL_APP_SECRET"] = payload["app_secret"].strip()
+                # Process memory only. Never echo submitted credentials or provider bodies.
+                self._send(200, {"configured": True, "verified": False})
+            elif self.path == "/api/webull/accounts":
+                from .market_data.webull import WebullProvider
+
+                self._send(200, {"accounts": WebullProvider().list_accounts()})
+            elif self.path == "/api/webull/select":
+                from .market_data.webull import WebullProvider
+
+                account_id = payload.get("account_id")
+                if not isinstance(account_id, str) or account_id not in {
+                    a["id"] for a in WebullProvider().list_accounts()
+                }:
+                    raise ValueError("Invalid account selection")
+                os.environ["WEBULL_ACCOUNT_ID"] = account_id
+                self._send(200, {"selected": True})
+            elif self.path == "/api/webull/account":
+                from .market_data.webull import WebullProvider
+
+                self._send(200, WebullProvider().account_snapshot())
+            elif self.path == "/api/scan":
                 from .scanner.dashboard import scan_payload
 
                 self._send(200, scan_payload(payload))
@@ -345,7 +421,14 @@ class BetaHandler(BaseHTTPRequestHandler):
             self._send(
                 400,
                 {
-                    "error": "Check the numeric fields, positive equity/entry, shares, stop below entry, and last-exit date."
+                    "error": (
+                        "Check the X token or use 1 to 100 uppercase stock tickers."
+                        if self.path.startswith("/api/social/") else
+                        "Check scanner price bounds ($0.01 to below $5), minimum gain, "
+                        "whole volume, depth (20/40/60), and account risk inputs."
+                        if self.path == "/api/scan"
+                        else "Check the numeric fields, positive equity/entry, shares, stop below entry, and last-exit date."
+                    )
                 },
             )
         except (RuntimeError, ImportError, OSError):

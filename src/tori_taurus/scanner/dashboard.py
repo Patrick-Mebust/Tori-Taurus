@@ -20,6 +20,7 @@ from tori_taurus.report import build_report
 from tori_taurus.risk import evaluate_risk
 
 from .discovery import discover
+from .filters import DiscoveryFilters
 
 
 def derive_plan(report, *, account=None, holding=None, context=None, demo=False, now=None):
@@ -192,6 +193,24 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
     mode = payload.get("mode", "demo")
     if mode not in {"demo", "live"}:
         raise ValueError("Invalid scan mode")
+    filters = DiscoveryFilters.from_payload(payload.get("filters"))
+    broker = None
+    if mode == "live" and payload.get("provider") == "webull":
+        from tori_taurus.market_data.webull import WebullProvider
+
+        provider = provider or WebullProvider()
+        broker = provider.account_snapshot()
+        payload = dict(payload)
+        limits = payload.get("account") or {}
+        payload["account"] = {
+            "equity": broker["equity"],
+            "buying_power": broker["buying_power"],
+            "risk_budget_percent": limits.get("risk_budget_percent", "1"),
+            "max_concentration_percent": limits.get("max_concentration_percent", "20"),
+        }
+        payload["holdings"] = broker["holdings"] if not broker["sizing_issues"] else []
+        if broker["sizing_issues"] or Decimal(broker["equity"]) <= 0:
+            payload["account"] = None
     account = payload.get("account") or None
     context = payload.get("guardrails") or {}
     holdings = payload.get("holdings", [])
@@ -222,16 +241,30 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
             ("DEMOD", "1.8", "none"),
         ]
         candidates = [
-            {"symbol": s, "change_percent": str(8 - i), "volume": 250000 - i * 20000}
-            for i, (s, _, _) in enumerate(specs)
+            {
+                "symbol": s,
+                "last": str(
+                    Decimal("2.01" if kind == "watch" else "2.10" if kind == "none" else "2.14")
+                    * Decimal(str(scale))
+                ),
+                "change_percent": str(8 - i),
+                "volume": 250000 - i * 20000,
+            }
+            for i, (s, scale, kind) in enumerate(specs)
         ]
+        candidates = [
+            c for c in candidates
+            if filters.matches(Decimal(c["last"]), Decimal(c["change_percent"]), c["volume"])
+        ]
+        demo_specs = {s: (s, scale, kind) for s, scale, kind in specs}
         coverage = {
             "universe": "Four fabricated scenarios, not real stocks",
             "discovered": 4,
-            "matched": 4,
-            "inspected": 4,
+            "matched": len(candidates),
+            "inspected": len(candidates),
             "not_inspected": 0,
             "analysis_feed": "synthetic",
+            "filters": filters.as_dict(),
             "limits": "Synthetic prices and volume; no live discovery.",
         }
     else:
@@ -246,7 +279,9 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
                 feed=payload.get("feed", "iex"),
                 max_pages=3,
             )
-        candidates, coverage = discover(provider)
+        candidates, coverage = (
+            provider.discover(filters) if broker else discover(provider, filters)
+        )
         sessions = sessions or NyseSessions()
         labeled = SessionProvider(provider, sessions)
     started = time.monotonic()
@@ -264,7 +299,7 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
         ticker = candidate["symbol"]
         try:
             if mode == "demo":
-                clock, quote, daily, bars = demo_observations(*specs[index])
+                clock, quote, daily, bars = demo_observations(*demo_specs[ticker])
             else:
                 quote, daily, bars = fetch_live_data(
                     ticker, provider.feed, now=now, provider=labeled, sessions=sessions
@@ -280,6 +315,7 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
                 warning = "Incomplete intraday observations; no setup-derived plan."
             if bars and warning is None:
                 report["intraday"]["last_close"] = str(bars[-1].close)
+            report["premarket_research"] = premarket_research(bars, quote, clock)
             plan = derive_plan(
                 report,
                 account=account,
@@ -288,11 +324,24 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
                 demo=mode == "demo",
                 now=now,
             )
+            if broker and (not account or not context.get("losses_confirmed", False)):
+                plan["risk"] = None
+                plan["guardrails"] = None
+                plan["state"] = "RISK BLOCKED"
+                plan["sizing_reason"] = (
+                    "Review broker account issues and confirm today’s realized losses before sizing. "
+                    "Day P/L does not establish realized losses."
+                )
             rows.append(
                 candidate
-                | {"quote": report["quote"], "plan": plan, "report": report, "warning": warning}
+                | {"quote": report["quote"], "plan": plan, "report": report, "warning": warning,
+                   "chart": {"source": quote.source, "mode": mode,
+                             "session": [chart_bar(b) for b in bars],
+                             "daily": [chart_bar(b) for b in daily]}}
             )
-        except (MarketDataError, ValueError, TypeError, KeyError, ArithmeticError):
+        except MarketDataError as exc:
+            errors.append({"symbol": ticker, "reason": str(exc)})
+        except (ValueError, TypeError, KeyError, ArithmeticError):
             errors.append(
                 {
                     "symbol": ticker,
@@ -335,9 +384,56 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
         "candidates": rows,
         "errors": errors,
         "account_configured": bool(account),
+        "broker_account": broker,
         "ready_to_trade": False,
         "ranking": "Eligible setup state, then snapshot percent change; no probability or profitability score.",
         "notice": "DEMO: fabricated stocks and observations."
         if mode == "demo"
-        else "Read-only market scan. Prices require revalidation before use. No broker positions or stops verified.",
+        else (
+            "Read-only Webull scan with broker-reported holdings. Stops and pending orders unverified."
+            if broker
+            else "Read-only market scan. Prices require revalidation before use. No broker positions or stops verified."
+        ),
     }
+
+
+def premarket_research(bars, quote, now):
+    """Observed premarket slice only, independent of regular-session sizing."""
+    from datetime import timedelta
+    from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
+
+    observed = [b for b in bars if b.session == "premarket"
+                and b.timestamp + timedelta(minutes=1) <= now]
+    if not observed:
+        return None
+    high, low = max(b.high for b in observed), min(b.low for b in observed)
+    last = observed[-1].close
+    tick = Decimal(".0001") if last < 1 else Decimal(".01")
+    fresh = quote.session == "premarket" and timedelta(0) <= now - quote.timestamp <= timedelta(
+        seconds=60)
+    two_sided = quote.bid > 0 and quote.ask >= quote.bid
+    spread = (quote.ask - quote.bid) / quote.ask * 100 if two_sided else None
+    eligible = len(observed) >= 3 and fresh and spread is not None and spread <= 2 and high > low
+    entry = (high / tick).to_integral_value(rounding=ROUND_CEILING) * tick + tick
+    stop = (low / tick).to_integral_value(rounding=ROUND_FLOOR) * tick - tick
+    eligible = eligible and stop > 0 and entry < 5
+    return {"session": "premarket", "observed_bars": len(observed),
+            "first_bar_at": observed[0].timestamp.isoformat(),
+            "last_bar_at": observed[-1].timestamp.isoformat(), "last": str(last),
+            "observed_volume": sum(int(b.volume) for b in observed),
+            "observed_high": str(high), "observed_low": str(low),
+            "spread_percent": str(spread) if spread is not None else None,
+            "conditional_entry": str(entry) if eligible else None,
+            "invalidation": str(stop) if eligible else None,
+            "risk_per_share": str(entry - stop) if eligible else None,
+            "quote_at": quote.timestamp.isoformat(),
+            "note": "Observed premarket bars only; gaps and missing intervals may exist. "
+                    "Levels require three bars and a fresh two-sided premarket quote with spread "
+                    "at most 2%. Invalidation is not a verified broker stop. No position sizing."}
+
+
+def chart_bar(bar):
+    """JSON-safe actual OHLCV observations; never fill missing intervals."""
+    return {"time": bar.timestamp.isoformat(), "open": str(bar.open),
+            "high": str(bar.high), "low": str(bar.low), "close": str(bar.close),
+            "volume": str(bar.volume), "session": bar.session, "interval": bar.interval}

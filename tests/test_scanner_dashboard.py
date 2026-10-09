@@ -25,6 +25,67 @@ def test_demo_discovers_distinct_scenarios_without_ticker_input():
     assert not data["ready_to_trade"] and not data["account_configured"]
 
 
+def test_webull_scan_reaches_quote_and_bars_with_broker_holdings():
+    clock, quote, daily, bars = demo_observations("TEST")
+    calls = []
+
+    class Provider:
+        feed = "webull"
+
+        def account_snapshot(self):
+            return {
+                "equity": "1000",
+                "buying_power": "20",
+                "holdings": [{"symbol": "TEST", "shares": "10", "average": "1.90"}],
+                "sizing_issues": [],
+            }
+
+        def discover(self, filters=None):
+            return [{"symbol": "TEST", "change_percent": "5", "volume": 250000}], {
+                "inspected": 1,
+                "not_inspected": 0,
+            }
+
+        def get_quote(self, ticker):
+            calls.append("quote")
+            return quote
+
+        def get_bars(self, ticker, start, end, interval):
+            calls.append(interval)
+            return daily if interval == "1d" else bars
+
+    class Calendar:
+        def classify(self, timestamp):
+            return "regular"
+
+        def _bounds(self, day):
+            from datetime import timedelta
+
+            return (
+                clock,
+                bars[0].timestamp,
+                clock + timedelta(hours=4),
+                clock + timedelta(hours=8),
+            )
+
+    result = scan_payload(
+        {
+            "mode": "live",
+            "provider": "webull",
+            "account": {"equity": "99999", "buying_power": "99999"},
+            "holdings": [{"symbol": "TEST", "shares": "99", "average": "9"}],
+        },
+        now=clock,
+        provider=Provider(),
+        sessions=Calendar(),
+    )
+    assert calls == ["quote", "1d", "1m"]
+    assert not result["errors"] and len(result["candidates"]) == 1
+    assert result["broker_account"]["buying_power"] == "20"
+    assert result["candidates"][0]["plan"]["holding"] == {"shares": "10", "average": "1.90"}
+    assert result["candidates"][0]["plan"]["risk"] is None
+
+
 def test_prices_are_derived_from_observed_levels_and_rounded():
     source = report()
     plan = derive_plan(source, demo=True)
@@ -149,3 +210,16 @@ def test_discovery_rejects_malformed_top_level(monkeypatch):
     monkeypatch.setattr(provider, "_get_json", lambda url: {})
     with pytest.raises(MarketDataError):
         discover(provider)
+
+
+def test_chart_payload_contains_observed_bars_and_serializes():
+    import json
+    data = scan_payload({"mode": "demo"})
+    for row in data["candidates"]:
+        chart = row["chart"]
+        assert chart["mode"] == "demo" and chart["source"] == "synthetic:scanner"
+        assert chart["session"] and chart["daily"]
+        for bar in chart["session"] + chart["daily"]:
+            assert set(bar) == {"time", "open", "high", "low", "close", "volume", "session", "interval"}
+        assert chart["session"][-1]["close"] == row["report"]["intraday"]["last_close"]
+    json.dumps(data)

@@ -16,3 +16,7 @@ jobs:
       - run: python -m pip install -e ".[dev,calendar]"
       - run: python -m pytest
       - run: python -m ruff check src tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/test_ranking.mjs
