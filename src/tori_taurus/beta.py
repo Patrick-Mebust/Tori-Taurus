@@ -381,7 +381,12 @@ class BetaHandler(BaseHTTPRequestHandler):
             self._send(
                 400,
                 {
-                    "error": "Check the numeric fields, positive equity/entry, shares, stop below entry, and last-exit date."
+                    "error": (
+                        "Check scanner price bounds ($0.01 to below $5), minimum gain, "
+                        "whole volume, depth (20/40/60), and account risk inputs."
+                        if self.path == "/api/scan"
+                        else "Check the numeric fields, positive equity/entry, shares, stop below entry, and last-exit date."
+                    )
                 },
             )
         except (RuntimeError, ImportError, OSError):

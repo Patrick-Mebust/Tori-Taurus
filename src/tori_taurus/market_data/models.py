@@ -54,11 +54,12 @@ class Bar:
     high: Decimal
     low: Decimal
     close: Decimal
-    volume: int
+    volume: int | Decimal
     interval: str
     source: str
     mode: str = "replay"
     session: str = "unknown"
+    volume_adjusted: bool = False
 
     def __post_init__(self):
         object.__setattr__(self, "symbol", symbol(self.symbol))
@@ -67,8 +68,14 @@ class Bar:
             object.__setattr__(self, key, price(getattr(self, key)))
         if not self.low <= min(self.open, self.close) <= max(self.open, self.close) <= self.high:
             raise ValueError("Invalid OHLC range")
-        if type(self.volume) is not int or self.volume < 0:
-            raise ValueError("Volume must be a nonnegative integer")
+        if type(self.volume_adjusted) is not bool:
+            raise ValueError("Invalid volume adjustment metadata")
+        if self.volume_adjusted:
+            if self.interval != "1d" or type(self.volume) not in {int, Decimal}:
+                raise ValueError("Adjusted volume requires a daily numeric observation")
+            object.__setattr__(self, "volume", price(self.volume))
+        elif type(self.volume) is not int or self.volume < 0:
+            raise ValueError("Unadjusted volume must be a nonnegative integer")
         if self.interval not in {"1m", "5m", "15m", "1h", "1d"}:
             raise ValueError("Unsupported interval")
         metadata(self.source, self.mode, self.session)

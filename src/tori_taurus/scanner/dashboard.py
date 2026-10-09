@@ -20,6 +20,7 @@ from tori_taurus.report import build_report
 from tori_taurus.risk import evaluate_risk
 
 from .discovery import discover
+from .filters import DiscoveryFilters
 
 
 def derive_plan(report, *, account=None, holding=None, context=None, demo=False, now=None):
@@ -192,6 +193,7 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
     mode = payload.get("mode", "demo")
     if mode not in {"demo", "live"}:
         raise ValueError("Invalid scan mode")
+    filters = DiscoveryFilters.from_payload(payload.get("filters"))
     broker = None
     if mode == "live" and payload.get("provider") == "webull":
         from tori_taurus.market_data.webull import WebullProvider
@@ -239,16 +241,30 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
             ("DEMOD", "1.8", "none"),
         ]
         candidates = [
-            {"symbol": s, "change_percent": str(8 - i), "volume": 250000 - i * 20000}
-            for i, (s, _, _) in enumerate(specs)
+            {
+                "symbol": s,
+                "last": str(
+                    Decimal("2.01" if kind == "watch" else "2.10" if kind == "none" else "2.14")
+                    * Decimal(str(scale))
+                ),
+                "change_percent": str(8 - i),
+                "volume": 250000 - i * 20000,
+            }
+            for i, (s, scale, kind) in enumerate(specs)
         ]
+        candidates = [
+            c for c in candidates
+            if filters.matches(Decimal(c["last"]), Decimal(c["change_percent"]), c["volume"])
+        ]
+        demo_specs = {s: (s, scale, kind) for s, scale, kind in specs}
         coverage = {
             "universe": "Four fabricated scenarios, not real stocks",
             "discovered": 4,
-            "matched": 4,
-            "inspected": 4,
+            "matched": len(candidates),
+            "inspected": len(candidates),
             "not_inspected": 0,
             "analysis_feed": "synthetic",
+            "filters": filters.as_dict(),
             "limits": "Synthetic prices and volume; no live discovery.",
         }
     else:
@@ -263,7 +279,9 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
                 feed=payload.get("feed", "iex"),
                 max_pages=3,
             )
-        candidates, coverage = provider.discover() if broker else discover(provider)
+        candidates, coverage = (
+            provider.discover(filters) if broker else discover(provider, filters)
+        )
         sessions = sessions or NyseSessions()
         labeled = SessionProvider(provider, sessions)
     started = time.monotonic()
@@ -281,7 +299,7 @@ def _scan_payload(payload, *, now=None, provider=None, sessions=None):
         ticker = candidate["symbol"]
         try:
             if mode == "demo":
-                clock, quote, daily, bars = demo_observations(*specs[index])
+                clock, quote, daily, bars = demo_observations(*demo_specs[ticker])
             else:
                 quote, daily, bars = fetch_live_data(
                     ticker, provider.feed, now=now, provider=labeled, sessions=sessions

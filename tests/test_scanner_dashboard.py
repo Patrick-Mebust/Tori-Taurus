@@ -40,7 +40,7 @@ def test_webull_scan_reaches_quote_and_bars_with_broker_holdings():
                 "sizing_issues": [],
             }
 
-        def discover(self):
+        def discover(self, filters=None):
             return [{"symbol": "TEST", "change_percent": "5", "volume": 250000}], {
                 "inspected": 1,
                 "not_inspected": 0,

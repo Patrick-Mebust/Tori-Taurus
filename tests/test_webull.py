@@ -122,6 +122,28 @@ def test_bars_sort_and_reject_delay_or_duplicates(broker):
         provider.get_bars("TEST", start, start + timedelta(minutes=2), "1m")
 
 
+def test_webull_adjusted_daily_volume_is_not_rounded(broker):
+    provider, _, _ = broker
+    start = datetime(2026, 10, 8, tzinfo=UTC)
+    row = {
+        "time": start.isoformat(),
+        "open": "2",
+        "high": "2.1",
+        "low": "1.9",
+        "close": "2",
+        "volume": "49894.2",
+        "trading_session": "RTH",
+    }
+    group = {"symbol": "TEST", "delay_minutes": 0, "result": [row]}
+    provider.data.market_data = SimpleNamespace(
+        get_batch_history_bar=lambda *a, **k: response({"result": [group]})
+    )
+    (bar,) = provider.get_bars("TEST", start, start + timedelta(days=1), "1d")
+    assert str(bar.volume) == "49894.2" and bar.volume_adjusted
+    with pytest.raises(MarketDataError):
+        provider.get_bars("TEST", start, start + timedelta(minutes=2), "1m")
+
+
 def test_real_sdk_constructor_accepts_verification_timeout(monkeypatch):
     sdk = pytest.importorskip("webull.data.data_client")
     monkeypatch.setenv("WEBULL_APP_KEY", "synthetic-key")

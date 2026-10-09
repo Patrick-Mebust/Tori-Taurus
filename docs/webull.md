@@ -41,7 +41,14 @@ the broker-reported cost basis. Fractional, short or unsupported holdings and op
 disable sizing. Realized losses must be confirmed separately; account day P/L is not used as
 realized losses. Stops and pending orders remain unverified.
 
-The scanner inspects at most 20 matches from the top active/gainer lists. It is not a full-market
-scan. Quote freshness and regular-session requirements still apply. Delayed bars are rejected;
+The scanner inspects up to the selected 20, 40 or 60 matches from the top active/gainer lists,
+within a 90-second detail budget. It is not a full-market scan. Price, positive-gain and snapshot
+volume filters apply before inspection. Quote freshness and regular-session requirements still
+apply. Delayed bars are rejected;
 missing data does not produce invented prices. Each candidate is a separate allocation scenario.
 Optional refresh starts 60 seconds after the previous scan finishes; it is polling, not streaming.
+
+Webull daily history is adjusted and can include fractional adjusted volume after corporate
+actions. Tori preserves that volume as a decimal and labels its basis; it does not round it into
+an unadjusted share count. Intraday bars still require whole volume. Completed-day relative volume
+uses daily history only and must not be presented as current intraday relative volume.

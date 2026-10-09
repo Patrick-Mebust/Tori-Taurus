@@ -237,7 +237,7 @@ class WebullProvider:
                 if not start <= timestamp < end:
                     continue
                 volume = price(row["volume"])
-                if volume != volume.to_integral_value():
+                if interval != "1d" and volume != volume.to_integral_value():
                     raise ValueError("Invalid volume")
                 if interval == "1m" and row["trading_session"] != "RTH":
                     raise ValueError("Unexpected session")
@@ -249,10 +249,11 @@ class WebullProvider:
                         row["high"],
                         row["low"],
                         row["close"],
-                        int(volume),
+                        volume if interval == "1d" else int(volume),
                         interval,
                         self.source,
                         mode="live",
+                        volume_adjusted=interval == "1d",
                     )
                 )
             bars.sort(key=lambda b: b.timestamp)
@@ -262,7 +263,10 @@ class WebullProvider:
         except (KeyError, ValueError, TypeError, ArithmeticError):
             raise MarketDataError("Webull bars delayed, missing or invalid.") from None
 
-    def discover(self):
+    def discover(self, filters=None):
+        from tori_taurus.scanner.filters import DiscoveryFilters
+
+        filters = filters or DiscoveryFilters()
         active = self.call(
             self.data.screener.list_most_active,
             "US_STOCK",
@@ -294,7 +298,7 @@ class WebullProvider:
                 if previous <= 0 or volume != volume.to_integral_value():
                     continue
                 change = (last / previous - 1) * 100
-                if Decimal(".01") <= last < 5 and change > 0 and volume >= 100000:
+                if filters.matches(last, change, volume):
                     candidates.append(
                         {
                             "symbol": symbol(row["symbol"]),
@@ -304,14 +308,16 @@ class WebullProvider:
                         }
                     )
             candidates.sort(key=lambda r: (-Decimal(r["change_percent"]), r["symbol"]))
-            return candidates[:20], {
+            depth = filters.max_candidates
+            return candidates[:depth], {
                 "universe": "Webull top 200 most active and top 200 gainers; not the full market",
                 "discovered": len(tickers),
                 "matched": len(candidates),
-                "inspected": min(20, len(candidates)),
-                "not_inspected": max(0, len(candidates) - 20),
+                "inspected": min(depth, len(candidates)),
+                "not_inspected": max(0, len(candidates) - depth),
+                "filters": filters.as_dict(),
                 "analysis_feed": self.source,
-                "limits": "Top 20 matches inspected. Partial-day volume; float, news and halts unverified. Daily bars use Webull adjustment; minute bars are unadjusted.",
+                "limits": f"Up to {depth} matches inspected within a 90-second detail budget. Partial-day volume; float, news and halts unverified. Daily bars and volume use Webull adjustment; minute bars are unadjusted.",
             }
         except (KeyError, ValueError, TypeError, ArithmeticError):
             raise MarketDataError("Webull discovery response unavailable or invalid.") from None

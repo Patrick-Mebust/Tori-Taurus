@@ -16,6 +16,27 @@ The screen puts planned dollar loss, account risk, allowable shares, concentrati
 
 Use **Connect my Webull account** to enter your API key and secret into the local app, then choose an account. Review [Webull setup, data entitlement and privacy](webull.md). Webull mode reads equity, buying power, holdings and average costs automatically. Confirm realized losses separately before sizing. Keys clear when the server stops.
 
+## Broader scans and stock details
+
+**Scanner filters & depth** controls the minimum price, exclusive price ceiling (at most $5),
+minimum positive snapshot gain and minimum snapshot session volume. Select 20, 40 or 60 detailed
+candidates. Filters run before the inspection cap on both Webull and Alpaca. The same provider
+active/gainer lists supply the universe; this does not turn the scan into exchange-wide discovery.
+A 90-second detail budget may leave additional matches uninspected. The coverage summary reports
+the applied filters and remaining matches. Demo mode applies the same filters to four synthetic stocks.
+
+Search inspected results by ticker, sort by setup, gain, volume, quoted spread or snapshot price,
+or show only stocks with levels, fresh regular-session quotes, or supplied/broker-reported holdings.
+These view controls do not make additional data requests or broaden the already completed scan.
+
+The stock detail panel shows bid/ask/spread, snapshot volume, observed intraday range and volume,
+VWAP, volume acceleration where available, completed daily EMA 5/9/20, RSI 14, ATR 14, daily opening
+gap and completed-day relative volume. All four setup checks show their state and explanation.
+Daily features describe the last completed daily bar, not current-session momentum. Intraday
+relative volume remains unavailable without matching historical session slices. Missing observations
+stay unavailable. Live entry, stop and sizing displays expire when the quote passes 60 seconds;
+refreshing the webpage alone does not refresh market observations.
+
 ## Connect Alpaca locally
 
 Set `ALPACA_API_KEY` and `ALPACA_API_SECRET` in the environment of the process launching Tori. Restart the server after setting them. Never paste keys into chat, source code, reports or GitHub. A `.env` file is not automatically loaded. The application does not collect credentials through its browser form.
