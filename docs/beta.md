@@ -108,3 +108,15 @@ sizing keep their existing eligibility checks. Discovery still uses bounded
 provider active/gainer lists and snapshot thresholds; it is not a comprehensive
 premarket universe or a ranking by premarket bar volume. Premarket discovery
 snapshot fields and live bar entitlement require authenticated verification.
+
+
+### Webull account selection
+
+Enter API keys once per server session, then choose an account and click Use this
+account. The password fields clear for privacy and hide once the server accepts
+credentials. Account selection reuses the session credentials; it does not submit
+blank replacements or navigate/reload the page. Page refresh restores account
+choices if the server still has keys. Replace credentials explicitly reveals the
+password fields while keeping the current connection until replacements are sent.
+Server restarts still clear process credentials. Changing accounts invalidates
+previous market plans so sizing cannot show a prior account's values.
