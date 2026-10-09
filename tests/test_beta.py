@@ -316,7 +316,8 @@ def test_scanner_endpoint_returns_candidates_without_ticker(local_server):
 def test_root_is_scanner_and_manual_planner_is_secondary(local_server):
     _, _, root = request(local_server, "GET", "/")
     _, _, planner = request(local_server, "GET", "/planner")
-    assert b"Candidate watchlist" in root
+    assert b"Momentum board" in root
+    assert b'id="topPicks"' in root
     assert b"Your trade plan" in planner
 
 
