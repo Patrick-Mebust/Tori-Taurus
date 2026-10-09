@@ -37,6 +37,20 @@ relative volume remains unavailable without matching historical session slices. 
 stay unavailable. Live entry, stop and sizing displays expire when the quote passes 60 seconds;
 refreshing the webpage alone does not refresh market observations.
 
+## Watch stocks between scans
+
+Select a candidate and click **Watch this stock**. The watch panel retains up to 50 tickers in
+the open tab, with optional setup-change notices after completed scans. The first eligible scan
+establishes a baseline; later changes to any of the four setup states produce an in-page notice.
+Notices do not place orders, use desktop notifications, or run scans by themselves. Use the existing
+scan button or optional refresh control to fetch new observations.
+
+Watched stocks are evaluated only if they appear in the latest inspected results. Missing or stale
+observations clear the comparison baseline, rather than suggesting that no change occurred. Changing
+data mode/feed resets comparisons and notices so demo and live observations are not mixed. At most
+20 notices are retained. Watchlists, baselines and notices clear when the webpage is refreshed or
+closed; credentials and broker values are never saved by this feature.
+
 ## Connect Alpaca locally
 
 Set `ALPACA_API_KEY` and `ALPACA_API_SECRET` in the environment of the process launching Tori. Restart the server after setting them. Never paste keys into chat, source code, reports or GitHub. A `.env` file is not automatically loaded. The application does not collect credentials through its browser form.
