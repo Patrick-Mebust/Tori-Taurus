@@ -53,3 +53,21 @@ Official access references:
 - [X search](https://docs.x.com/x-api/posts/search/introduction)
 - [X pricing and spending limits](https://docs.x.com/x-api/getting-started/pricing)
 - [TikTok eligibility](https://developers.tiktok.com/docs/en/research-api-faq)
+
+## Private local X connection
+
+The Public social buzz panel now accepts an X bearer token in a password field.
+Click **Use token for this session**; the field clears and the server stores it
+only in process memory. No verification or billing occurs at connection time.
+**Disconnect X** removes the process token. A server restart clears tokens entered
+through the form, including existing Webull session credentials.
+
+Enter real tickers or use tickers from the latest live market scan. Demo symbols
+are not transferred to a paid search. Check the per-scan cost acknowledgment and
+click **Scan public X posts**. The acknowledgment resets after every request;
+there is no automatic social polling. Only one social scan can run at a time.
+The estimated maximum is $0.50 for 100 post reads at $0.005 per post; prices may
+change, so verify X pricing and configure a billing-cycle spending limit.
+
+Imported files remain supported. All reports are timestamped snapshots; an X
+access failure is coverage unavailable, never a successful zero-mention result.

@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import threading
 import webbrowser
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -16,6 +17,8 @@ from .market_data.models import symbol
 from .market_data.webull import credentials_available as webull_credentials_available
 from .report import build_report
 from .risk import RiskInputs
+
+SOCIAL_SCAN_LOCK = threading.Lock()
 
 
 def credentials_available() -> bool:
@@ -311,6 +314,7 @@ class BetaHandler(BaseHTTPRequestHandler):
                     "version": "0.3.0b1",
                     "credentials_configured": credentials_available(),
                     "webull_configured": webull_credentials_available(),
+                    "x_configured": bool(os.environ.get("TORI_X_BEARER_TOKEN", "").strip()),
                     "live_verified": False,
                     "default_mode": "demo",
                 },
@@ -329,6 +333,9 @@ class BetaHandler(BaseHTTPRequestHandler):
             return
         if self.path not in {
             "/api/report",
+            "/api/social/connect",
+            "/api/social/disconnect",
+            "/api/social/scan",
             "/api/scan",
             "/api/webull/connect",
             "/api/webull/account",
@@ -342,7 +349,37 @@ class BetaHandler(BaseHTTPRequestHandler):
             if not 0 < length <= 16384:
                 raise ValueError("Invalid request length")
             payload = json.loads(self.rfile.read(length))
-            if self.path == "/api/webull/connect":
+            if self.path == "/api/social/connect":
+                token = payload.get("token")
+                if not isinstance(token, str) or not 20 <= len(token) <= 2048 or any(
+                    c.isspace() or ord(c) < 33 or ord(c) > 126 for c in token
+                ):
+                    raise ValueError("Invalid token")
+                os.environ["TORI_X_BEARER_TOKEN"] = token
+                self._send(200, {"configured": True, "verified": False})
+            elif self.path == "/api/social/disconnect":
+                os.environ.pop("TORI_X_BEARER_TOKEN", None)
+                self._send(200, {"configured": False})
+            elif self.path == "/api/social/scan":
+                from .social import collect, summarize
+
+                symbols = payload.get("symbols")
+                now = datetime.now(UTC)
+                if not isinstance(symbols, list) or any(not isinstance(s, str) for s in symbols):
+                    raise ValueError("Invalid ticker list")
+                summarize([], symbols, now, [])
+                if payload.get("allow_paid_x") is not True or not os.environ.get(
+                    "TORI_X_BEARER_TOKEN", ""
+                ).strip():
+                    self._send(400, {"error": "Connect X and acknowledge the paid scan first."})
+                elif not SOCIAL_SCAN_LOCK.acquire(blocking=False):
+                    self._send(409, {"error": "A social scan is already running. Wait for its result."})
+                else:
+                    try:
+                        self._send(200, collect(symbols, now, allow_paid_x=True))
+                    finally:
+                        SOCIAL_SCAN_LOCK.release()
+            elif self.path == "/api/webull/connect":
                 for key in ("app_key", "app_secret"):
                     value = payload.get(key)
                     if not isinstance(value, str) or not 1 <= len(value.strip()) <= 512:
@@ -382,6 +419,8 @@ class BetaHandler(BaseHTTPRequestHandler):
                 400,
                 {
                     "error": (
+                        "Check the X token or use 1 to 100 uppercase stock tickers."
+                        if self.path.startswith("/api/social/") else
                         "Check scanner price bounds ($0.01 to below $5), minimum gain, "
                         "whole volume, depth (20/40/60), and account risk inputs."
                         if self.path == "/api/scan"
