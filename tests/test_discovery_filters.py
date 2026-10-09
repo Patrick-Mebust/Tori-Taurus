@@ -122,3 +122,40 @@ def test_adjusted_daily_volume_preserves_fractional_values_and_json_boundary():
             "synthetic",
             volume_adjusted=True,
         )
+
+
+def discovery_provider(listings, snapshots):
+    def response(value):
+        return SimpleNamespace(status_code=200, json=lambda: value)
+    provider = WebullProvider(data=SimpleNamespace(screener=SimpleNamespace(
+        list_most_active=lambda *a, **k: response(listings),
+        list_gainers_losers=lambda *a, **k: response([]))), account=SimpleNamespace())
+    provider.snapshots = lambda symbols: snapshots
+    return provider
+
+
+def test_discovery_skips_invalid_rows_and_reports_missing_coverage():
+    p = discovery_provider([{"symbol": "GOOD"}, {"symbol": "BAD"}, None], [
+        {"symbol": "BAD", "price": None},
+        {"symbol": "GOOD", "price": "2", "pre_close": "1", "volume": "200000"},
+        {"symbol": "GOOD", "price": "2", "pre_close": "1", "volume": "200000"}])
+    rows, coverage = p.discover()
+    assert len(rows) == 1 and rows[0]["symbol"] == "GOOD"
+    assert coverage["invalid_listing_rows"] == 1
+    assert coverage["invalid_snapshot_rows"] == 1
+    assert coverage["missing_snapshots"] == 1
+    assert coverage["discovered"] == 2
+
+
+@pytest.mark.parametrize("listings,snapshots", [
+    ({"unexpected": []}, []),
+    ([None], []),
+    ([{"symbol": "BAD"}], {"unexpected": []}),
+    ([{"symbol": "BAD"}], []),
+    ([{"symbol": "BAD"}], [{"symbol": "BAD", "price": "private-sentinel"}]),
+])
+def test_unusable_discovery_is_error_not_zero_matches(listings, snapshots):
+    from tori_taurus.market_data import MarketDataError
+    with pytest.raises(MarketDataError) as exc:
+        discovery_provider(listings, snapshots).discover()
+    assert "private-sentinel" not in str(exc.value)

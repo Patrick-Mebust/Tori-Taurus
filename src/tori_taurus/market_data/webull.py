@@ -282,42 +282,65 @@ class WebullProvider:
             direction="DESC",
         )
         try:
-            tickers = sorted({symbol(r["symbol"]) for r in active + gainers})
+            if not isinstance(active, list) or not isinstance(gainers, list):
+                raise MarketDataError("Webull discovery lists have an unsupported format. Retry later.")
+            tickers_set, invalid_listing_rows = set(), 0
+            for listing in active + gainers:
+                try:
+                    tickers_set.add(symbol(listing["symbol"]))
+                except (KeyError, ValueError, TypeError, AttributeError):
+                    invalid_listing_rows += 1
+            if active + gainers and not tickers_set:
+                raise MarketDataError("Webull discovery lists contain no usable stock symbols.")
+            tickers = sorted(tickers_set)
             if len(tickers) > 400:
                 raise ValueError("Unexpected discovery size")
             rows = []
             for offset in range(0, len(tickers), 100):
-                rows.extend(self.snapshots(tickers[offset : offset + 100]))
-            candidates = []
+                batch = self.snapshots(tickers[offset : offset + 100])
+                if not isinstance(batch, list):
+                    raise MarketDataError("Webull stock snapshots have an unsupported format. Retry later.")
+                rows.extend(batch)
+            candidates, usable_symbols, invalid_snapshot_rows = [], set(), 0
             for row in rows:
-                last, previous, volume = (
-                    price(row["price"]),
-                    price(row["pre_close"]),
-                    price(row["volume"]),
-                )
-                if previous <= 0 or volume != volume.to_integral_value():
-                    continue
-                change = (last / previous - 1) * 100
-                if filters.matches(last, change, volume):
-                    candidates.append(
-                        {
-                            "symbol": symbol(row["symbol"]),
-                            "last": str(last),
-                            "change_percent": str(change),
-                            "volume": int(volume),
-                        }
+                try:
+                    ticker = symbol(row["symbol"])
+                    if ticker not in tickers_set:
+                        raise ValueError("Unrequested stock")
+                    last, previous, volume = (
+                        price(row["price"]), price(row["pre_close"]), price(row["volume"])
                     )
+                    if last <= 0 or previous <= 0 or volume != volume.to_integral_value():
+                        raise ValueError("Incomplete snapshot")
+                    if ticker in usable_symbols:
+                        continue
+                    usable_symbols.add(ticker)
+                    change = (last / previous - 1) * 100
+                    if filters.matches(last, change, volume):
+                        candidates.append({"symbol": ticker, "last": str(last),
+                                           "change_percent": str(change), "volume": int(volume)})
+                except (KeyError, ValueError, TypeError, ArithmeticError, AttributeError):
+                    invalid_snapshot_rows += 1
+            if tickers and not usable_symbols:
+                raise MarketDataError(
+                    "Webull returned no usable stock snapshots. Price, previous close or volume "
+                    "was missing or invalid. Retry later; this is not a zero-match scan."
+                )
+            missing_snapshots = len(tickers_set - usable_symbols)
             candidates.sort(key=lambda r: (-Decimal(r["change_percent"]), r["symbol"]))
             depth = filters.max_candidates
             return candidates[:depth], {
                 "universe": "Webull top 200 most active and top 200 gainers; not the full market",
                 "discovered": len(tickers),
                 "matched": len(candidates),
+                "invalid_listing_rows": invalid_listing_rows,
+                "invalid_snapshot_rows": invalid_snapshot_rows,
+                "missing_snapshots": missing_snapshots,
                 "inspected": min(depth, len(candidates)),
                 "not_inspected": max(0, len(candidates) - depth),
                 "filters": filters.as_dict(),
                 "analysis_feed": self.source,
-                "limits": f"Up to {depth} matches inspected within a 90-second detail budget. Partial-day volume; float, news and halts unverified. Daily bars and volume use Webull adjustment; minute bars are unadjusted.",
+                "limits": f"Excluded {invalid_listing_rows} invalid discovery rows and {invalid_snapshot_rows} invalid snapshot rows; {missing_snapshots} discovered stocks lacked usable snapshots. Up to {depth} matches inspected within a 90-second detail budget. Partial-day volume; float, news and halts unverified. Daily bars and volume use Webull adjustment; minute bars are unadjusted.",
             }
         except (KeyError, ValueError, TypeError, ArithmeticError):
             raise MarketDataError("Webull discovery response unavailable or invalid.") from None
