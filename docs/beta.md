@@ -48,8 +48,10 @@ scan button or optional refresh control to fetch new observations.
 Watched stocks are evaluated only if they appear in the latest inspected results. Missing or stale
 observations clear the comparison baseline, rather than suggesting that no change occurred. Changing
 data mode/feed resets comparisons and notices so demo and live observations are not mixed. At most
-20 notices are retained. Watchlists, baselines and notices clear when the webpage is refreshed or
-closed; credentials and broker values are never saved by this feature.
+20 notices are retained. Only the watched ticker list is saved in browser session storage and survives page refreshes
+in that tab. Closing the tab ends the watchlist session. Baselines and notices reset on refresh;
+credentials and broker values are never saved by this feature. When view filters hide every
+inspected stock, **Show all inspected stocks** clears those view filters without another data request.
 
 ## Connect Alpaca locally
 
